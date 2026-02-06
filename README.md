@@ -371,6 +371,3 @@ Secondary indexes denormalize cell data into separate per-shard tables for effic
 - **Shard key field** — JSON field used for index sharding
 - **Fields** — JSON fields to copy into the index
 
-## License
-
-See [LICENSE](LICENSE) for details.

@@ -30,8 +30,11 @@ func main() {
 		logLevel = slog.LevelWarn
 	case "error":
 		logLevel = slog.LevelError
+	case "info":
+		logLevel = slog.LevelInfo
 	default:
 		logLevel = slog.LevelInfo
+		slog.Warn("invalid log level, defaulting to info", "value", cfg.LogLevel)
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger)
