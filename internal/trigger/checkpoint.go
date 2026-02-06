@@ -2,8 +2,10 @@ package trigger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 )
@@ -38,8 +40,10 @@ func (c *PostgresCheckpoint) Load(ctx context.Context, shardID shard.ID, columnN
 		int(shardID), columnName,
 	).Scan(&addedID)
 	if err != nil {
-		// If no row exists, start from 0
-		return 0, nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("load checkpoint shard %d col %s: %w", shardID, columnName, err)
 	}
 	return addedID, nil
 }

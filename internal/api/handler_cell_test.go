@@ -120,7 +120,7 @@ func chiContext(r *http.Request, params map[string]string) *http.Request {
 func TestWriteCell_Success(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	rowKey := uuid.New()
 	body := map[string]any{
@@ -155,7 +155,7 @@ func TestWriteCell_Success(t *testing.T) {
 func TestWriteCell_InvalidBody(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/cells", bytes.NewReader([]byte("invalid json")))
 	w := httptest.NewRecorder()
@@ -170,7 +170,7 @@ func TestWriteCell_InvalidBody(t *testing.T) {
 func TestWriteCell_MissingRowKey(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	body := map[string]any{
 		"column_name": "profile",
@@ -192,7 +192,7 @@ func TestWriteCell_MissingRowKey(t *testing.T) {
 func TestWriteCell_MissingColumnName(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	body := map[string]any{
 		"row_key": uuid.New().String(),
@@ -214,7 +214,7 @@ func TestWriteCell_MissingColumnName(t *testing.T) {
 func TestWriteCell_MissingBody(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	body := map[string]any{
 		"row_key":     uuid.New().String(),
@@ -237,7 +237,7 @@ func TestWriteCell_StoreError(t *testing.T) {
 	store := newMockCellStore()
 	store.writeErr = errors.New("db error")
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	body := map[string]any{
 		"row_key":     uuid.New().String(),
@@ -272,7 +272,7 @@ func TestGetCell_Success(t *testing.T) {
 	}
 
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)
 	req = chiContext(req, map[string]string{
@@ -292,7 +292,7 @@ func TestGetCell_Success(t *testing.T) {
 func TestGetCell_InvalidRowKey(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/not-a-uuid/profile/1", nil)
 	req = chiContext(req, map[string]string{
@@ -312,7 +312,7 @@ func TestGetCell_InvalidRowKey(t *testing.T) {
 func TestGetCell_InvalidRefKey(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/abc", nil)
@@ -333,7 +333,7 @@ func TestGetCell_InvalidRefKey(t *testing.T) {
 func TestGetCell_NotFound(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)
@@ -355,7 +355,7 @@ func TestGetCell_StoreError(t *testing.T) {
 	store := newMockCellStore()
 	store.getErr = errors.New("db error")
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)
@@ -396,7 +396,7 @@ func TestGetCellLatest_Success(t *testing.T) {
 	}
 
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile", nil)
 	req = chiContext(req, map[string]string{
@@ -423,7 +423,7 @@ func TestGetCellLatest_Success(t *testing.T) {
 func TestGetCellLatest_InvalidRowKey(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/invalid/profile", nil)
 	req = chiContext(req, map[string]string{
@@ -442,7 +442,7 @@ func TestGetCellLatest_InvalidRowKey(t *testing.T) {
 func TestGetCellLatest_NotFound(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile", nil)
@@ -463,7 +463,7 @@ func TestGetCellLatest_StoreError(t *testing.T) {
 	store := newMockCellStore()
 	store.latestErr = errors.New("db error")
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile", nil)
@@ -491,7 +491,7 @@ func TestGetRow_Success(t *testing.T) {
 	}
 
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String(), nil)
 	req = chiContext(req, map[string]string{
@@ -523,7 +523,7 @@ func TestGetRow_Success(t *testing.T) {
 func TestGetRow_InvalidRowKey(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/not-a-uuid", nil)
 	req = chiContext(req, map[string]string{
@@ -541,7 +541,7 @@ func TestGetRow_InvalidRowKey(t *testing.T) {
 func TestGetRow_Empty(t *testing.T) {
 	store := newMockCellStore()
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String(), nil)
@@ -561,7 +561,7 @@ func TestGetRow_StoreError(t *testing.T) {
 	store := newMockCellStore()
 	store.rowErr = errors.New("db error")
 	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String(), nil)
@@ -581,7 +581,7 @@ func TestGetRow_StoreError(t *testing.T) {
 
 func TestNewCellHandler(t *testing.T) {
 	router := shard.NewRouter()
-	h := NewCellHandler(router, 64)
+	h := NewCellHandler(router, 64, testLogger())
 	if h == nil {
 		t.Fatal("NewCellHandler returned nil")
 	}
@@ -592,7 +592,7 @@ func TestNewCellHandler(t *testing.T) {
 func TestWriteCell_ShardRoutingError(t *testing.T) {
 	// Router with no stores registered
 	router := shard.NewRouter()
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	body := map[string]any{
 		"row_key":     uuid.New().String(),
@@ -614,7 +614,7 @@ func TestWriteCell_ShardRoutingError(t *testing.T) {
 
 func TestGetCell_ShardRoutingError(t *testing.T) {
 	router := shard.NewRouter()
-	handler := NewCellHandler(router, 64)
+	handler := NewCellHandler(router, 64, testLogger())
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)

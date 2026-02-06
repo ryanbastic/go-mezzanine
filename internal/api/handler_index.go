@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -13,11 +14,12 @@ import (
 type IndexHandler struct {
 	registry  *index.Registry
 	numShards int
+	logger    *slog.Logger
 }
 
 // NewIndexHandler creates a new IndexHandler.
-func NewIndexHandler(registry *index.Registry, numShards int) *IndexHandler {
-	return &IndexHandler{registry: registry, numShards: numShards}
+func NewIndexHandler(registry *index.Registry, numShards int, logger *slog.Logger) *IndexHandler {
+	return &IndexHandler{registry: registry, numShards: numShards, logger: logger}
 }
 
 // QueryIndex handles GET /v1/index/{index_name}/{shard_key}
@@ -25,6 +27,7 @@ func (h *IndexHandler) QueryIndex(w http.ResponseWriter, r *http.Request) {
 	indexName := chi.URLParam(r, "index_name")
 	shardKey, err := uuid.Parse(chi.URLParam(r, "shard_key"))
 	if err != nil {
+		h.logger.Warn("invalid shard_key", "error", err)
 		writeError(w, http.StatusBadRequest, "invalid shard_key")
 		return
 	}
@@ -38,6 +41,7 @@ func (h *IndexHandler) QueryIndex(w http.ResponseWriter, r *http.Request) {
 
 	entries, err := store.QueryByShardKey(r.Context(), shardKey)
 	if err != nil {
+		h.logger.Error("failed to query index", "index_name", indexName, "shard_key", shardKey, "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to query index")
 		return
 	}

@@ -17,8 +17,8 @@ func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.R
 	mux.Use(Logging(logger))
 	mux.Use(Recovery(logger))
 
-	cellHandler := NewCellHandler(router, numShards)
-	indexHandler := NewIndexHandler(indexRegistry, numShards)
+	cellHandler := NewCellHandler(router, numShards, logger)
+	indexHandler := NewIndexHandler(indexRegistry, numShards, logger)
 
 	mux.Route("/v1", func(r chi.Router) {
 		// Cell operations

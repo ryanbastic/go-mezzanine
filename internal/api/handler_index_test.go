@@ -24,7 +24,7 @@ import (
 
 func TestQueryIndex_InvalidShardKey(t *testing.T) {
 	registry := index.NewRegistry()
-	handler := NewIndexHandler(registry, 64)
+	handler := NewIndexHandler(registry, 64, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/index/test_idx/not-a-uuid", nil)
 	rctx := chi.NewRouteContext()
@@ -50,7 +50,7 @@ func TestQueryIndex_InvalidShardKey(t *testing.T) {
 
 func TestQueryIndex_IndexNotFound(t *testing.T) {
 	registry := index.NewRegistry()
-	handler := NewIndexHandler(registry, 64)
+	handler := NewIndexHandler(registry, 64, testLogger())
 
 	shardKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/index/nonexistent/"+shardKey.String(), nil)
@@ -69,7 +69,7 @@ func TestQueryIndex_IndexNotFound(t *testing.T) {
 
 func TestNewIndexHandler(t *testing.T) {
 	registry := index.NewRegistry()
-	h := NewIndexHandler(registry, 64)
+	h := NewIndexHandler(registry, 64, testLogger())
 	if h == nil {
 		t.Fatal("NewIndexHandler returned nil")
 	}
