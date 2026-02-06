@@ -7,8 +7,8 @@ import (
 )
 
 type Config struct {
-	DatabaseURL string
-	Port        string
+	ShardConfigPath string
+	Port            string
 	NumShards   int
 	LogLevel    string
 
@@ -23,7 +23,7 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		DatabaseURL:         getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/mezzanine?sslmode=disable"),
+		ShardConfigPath:     getEnvRequired("SHARD_CONFIG_PATH"),
 		Port:                getEnv("PORT", "8080"),
 		NumShards:           getEnvInt("NUM_SHARDS", 64),
 		LogLevel:            getEnv("LOG_LEVEL", "info"),
@@ -32,6 +32,14 @@ func Load() Config {
 		CBMaxFailures:       getEnvInt("CB_MAX_FAILURES", 5),
 		CBResetTimeout:      getEnvDuration("CB_RESET_TIMEOUT", 30*time.Second),
 	}
+}
+
+func getEnvRequired(key string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		panic("required environment variable " + key + " is not set")
+	}
+	return v
 }
 
 func getEnv(key, fallback string) string {

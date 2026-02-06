@@ -20,18 +20,20 @@ Mezzanine stores data as JSON cells addressed by three coordinates: **row key** 
                      └────────┬────────┘
                               │
             ┌─────────────────┼─────────────────┐
-            │                 │                 │
-      ┌─────▼─────┐    ┌─────▼─────┐    ┌─────▼─────┐
-      │ cells_0000 │    │ cells_0001 │···│ cells_0063 │
-      └─────┬──────┘    └─────┬──────┘   └─────┬──────┘
-            └─────────────────┼─────────────────┘
-                              │
-                       ┌──────▼──────┐
-                       │ PostgreSQL  │
-                       └─────────────┘
+            │                                   │
+   ┌────────▼─────────┐               ┌────────▼─────────┐
+   │  Backend "db1"   │               │  Backend "db2"   │
+   │ cells_0000..0031 │               │ cells_0032..0063 │
+   └────────┬─────────┘               └────────┬─────────┘
+            │                                   │
+     ┌──────▼──────┐                     ┌──────▼──────┐
+     │ PostgreSQL 1│                     │ PostgreSQL 2│
+     └─────────────┘                     └─────────────┘
 
       Trigger Watchers (per shard × column) ──▶ Handlers
 ```
+
+Shards are distributed across multiple PostgreSQL backends. Each backend owns a contiguous range of shards and gets its own connection pool. The mapping is defined in a JSON config file (see [Shard Configuration](#shard-configuration)).
 
 | Package | Purpose |
 |---|---|
@@ -55,14 +57,14 @@ Mezzanine stores data as JSON cells addressed by three coordinates: **row key** 
 ### Run with Docker Compose
 
 ```bash
-# Start PostgreSQL
+# Start both PostgreSQL instances
 docker compose up -d
 
 # Build and run
-go run ./cmd/mezzanine
+SHARD_CONFIG_PATH=shards.json go run ./cmd/mezzanine
 ```
 
-The server starts on port `8080` by default. Migrations run automatically on startup, creating per-shard tables and indexes.
+The server starts on port `8080` by default. Migrations run automatically on startup, creating per-shard tables and indexes on each backend.
 
 ### Configuration
 
@@ -70,7 +72,7 @@ All settings are configured via environment variables:
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/mezzanine?sslmode=disable` | PostgreSQL connection string |
+| `SHARD_CONFIG_PATH` | *(required)* | Path to JSON shard config file |
 | `PORT` | `8080` | HTTP server port |
 | `NUM_SHARDS` | `64` | Number of data shards |
 | `LOG_LEVEL` | `info` | Log level (`debug`, `info`, `warn`, `error`) |
@@ -78,6 +80,38 @@ All settings are configured via environment variables:
 | `TRIGGER_BATCH_SIZE` | `100` | Max cells processed per trigger poll |
 | `CB_MAX_FAILURES` | `5` | Circuit breaker failure threshold |
 | `CB_RESET_TIMEOUT` | `30s` | Circuit breaker recovery timeout |
+
+### Shard Configuration
+
+`SHARD_CONFIG_PATH` points to a JSON file that maps shard ranges to PostgreSQL backends. Each backend owns a contiguous, non-overlapping range of shards, and the union of all ranges must cover `0` through `NUM_SHARDS - 1`.
+
+```json
+{
+  "backends": [
+    {
+      "name": "db1",
+      "database_url": "postgres://user:pass@host1:5432/mezzanine?sslmode=disable",
+      "shard_start": 0,
+      "shard_end": 31
+    },
+    {
+      "name": "db2",
+      "database_url": "postgres://user:pass@host2:5432/mezzanine?sslmode=disable",
+      "shard_start": 32,
+      "shard_end": 63
+    }
+  ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `name` | Identifier used in log messages |
+| `database_url` | PostgreSQL connection string for this backend |
+| `shard_start` | First shard ID (inclusive) |
+| `shard_end` | Last shard ID (inclusive) |
+
+An example config for local development is provided in [`shards.json`](shards.json), matching the two Postgres services in `docker-compose.yml`.
 
 ## API Reference
 
@@ -312,6 +346,8 @@ shard_id = fnv32a(row_key) % num_shards
 ```
 
 Each shard has its own PostgreSQL table (`cells_0000` through `cells_0063`), providing natural partitioning. All versions of a given row key live on the same shard.
+
+Shards are distributed across multiple PostgreSQL backends via the shard config file. Each backend gets its own connection pool and manages its own shard tables, trigger checkpoint rows, and migrations independently.
 
 ## Triggers
 

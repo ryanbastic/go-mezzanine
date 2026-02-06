@@ -1,0 +1,16 @@
+{
+  "backends": [
+    {
+      "name": "db1",
+      "database_url": "postgres://postgres:postgres@localhost:5432/mezzanine?sslmode=disable",
+      "shard_start": 0,
+      "shard_end": 31
+    },
+    {
+      "name": "db2",
+      "database_url": "postgres://postgres:postgres@localhost:5433/mezzanine?sslmode=disable",
+      "shard_start": 32,
+      "shard_end": 63
+    }
+  ]
+}

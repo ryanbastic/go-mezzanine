@@ -38,42 +38,66 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Connect to PostgreSQL
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	// Load shard config
+	shardCfg, err := config.LoadShardConfig(cfg.ShardConfigPath, cfg.NumShards)
 	if err != nil {
-		logger.Error("failed to connect to database", "error", err)
+		logger.Error("failed to load shard config", "error", err)
 		os.Exit(1)
 	}
-	defer pool.Close()
 
-	if err := pool.Ping(ctx); err != nil {
-		logger.Error("failed to ping database", "error", err)
-		os.Exit(1)
+	// Create one pool per backend, ping each
+	pools := make(map[string]*pgxpool.Pool, len(shardCfg.Backends))
+	for _, b := range shardCfg.Backends {
+		pool, err := pgxpool.New(ctx, b.DatabaseURL)
+		if err != nil {
+			logger.Error("failed to connect to backend", "backend", b.Name, "error", err)
+			os.Exit(1)
+		}
+		if err := pool.Ping(ctx); err != nil {
+			logger.Error("failed to ping backend", "backend", b.Name, "error", err)
+			os.Exit(1)
+		}
+		pools[b.Name] = pool
+		logger.Info("connected to backend", "backend", b.Name, "shards", []int{b.ShardStart, b.ShardEnd})
 	}
-	logger.Info("connected to database")
+	defer func() {
+		for name, pool := range pools {
+			pool.Close()
+			logger.Info("closed pool", "backend", name)
+		}
+	}()
 
-	// Run migrations
-	if err := storage.RunMigrations(ctx, pool, cfg.NumShards); err != nil {
-		logger.Error("failed to run migrations", "error", err)
-		os.Exit(1)
+	// Run migrations per backend
+	for _, b := range shardCfg.Backends {
+		pool := pools[b.Name]
+		if err := storage.RunMigrationsForPool(ctx, pool, b.ShardStart, b.ShardEnd); err != nil {
+			logger.Error("failed to run migrations", "backend", b.Name, "error", err)
+			os.Exit(1)
+		}
+		logger.Info("migrations complete", "backend", b.Name, "shards", []int{b.ShardStart, b.ShardEnd})
 	}
-	logger.Info("migrations complete", "shards", cfg.NumShards)
 
-	// Initialize shard router
+	// Build shard-to-pool mapping and register stores
 	router := shard.NewRouter()
 	stores := make(map[shard.ID]storage.CellStore, cfg.NumShards)
-	for i := 0; i < cfg.NumShards; i++ {
-		s := storage.NewPostgresStore(pool, i)
-		router.Register(shard.ID(i), s)
-		stores[shard.ID(i)] = s
+	shardPools := make(map[shard.ID]*pgxpool.Pool, cfg.NumShards)
+
+	for _, b := range shardCfg.Backends {
+		pool := pools[b.Name]
+		for i := b.ShardStart; i <= b.ShardEnd; i++ {
+			s := storage.NewPostgresStore(pool, i)
+			router.Register(shard.ID(i), s)
+			stores[shard.ID(i)] = s
+			shardPools[shard.ID(i)] = pool
+		}
 	}
 
-	// Initialize index registry (indexes can be registered here)
+	// Initialize index registry
 	indexRegistry := index.NewRegistry()
 
 	// Initialize trigger framework
 	triggerRegistry := trigger.NewRegistry()
-	checkpoint := trigger.NewPostgresCheckpoint(pool)
+	checkpoint := trigger.NewPostgresCheckpoint(shardPools)
 
 	// Example: register a trigger that logs every new "base" column cell
 	triggerRegistry.Register("base", func(ctx context.Context, c cell.Cell) error {

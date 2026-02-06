@@ -17,3 +17,6 @@ clean:
 
 claude:
 	claude --dangerously-skip-permissions
+
+claude_resume:
+	claude --resume dd93d1da-a859-4148-b51d-6dff9219e84b
