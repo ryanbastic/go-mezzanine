@@ -10,10 +10,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/ryanbastic/go-mezzanine/internal/index"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
+	"github.com/ryanbastic/go-mezzanine/internal/trigger"
 )
 
 // NewServer creates an HTTP server with all routes configured.
-func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.Registry, numShards int) http.Handler {
+func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.Registry, pluginRegistry *trigger.PluginRegistry, notifier *trigger.Notifier, numShards int) http.Handler {
 	mux := chi.NewRouter()
 
 	mux.Use(RequestID)
@@ -24,11 +25,13 @@ func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.R
 	config.Info.Description = "Sharded cell-based data store"
 	api := humachi.New(mux, config)
 
-	cellHandler := NewCellHandler(router, numShards, logger)
+	cellHandler := NewCellHandler(router, numShards, notifier, logger)
 	indexHandler := NewIndexHandler(indexRegistry, numShards, logger)
+	pluginHandler := NewPluginHandler(pluginRegistry, logger)
 
 	registerCellRoutes(api, cellHandler)
 	registerIndexRoutes(api, indexHandler)
+	registerPluginRoutes(api, pluginHandler)
 	registerHealthRoute(api)
 	registerShardRoutes(api, numShards)
 

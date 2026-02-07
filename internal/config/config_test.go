@@ -15,9 +15,6 @@ func TestLoad_Defaults(t *testing.T) {
 	os.Unsetenv("PORT")
 	os.Unsetenv("NUM_SHARDS")
 	os.Unsetenv("LOG_LEVEL")
-	os.Unsetenv("TRIGGER_POLL_INTERVAL")
-	os.Unsetenv("TRIGGER_BATCH_SIZE")
-
 	cfg := Load()
 
 	if cfg.ShardConfigPath != "/tmp/shards.json" {
@@ -32,12 +29,6 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.LogLevel != "info" {
 		t.Errorf("LogLevel: got %q, want %q", cfg.LogLevel, "info")
 	}
-	if cfg.TriggerPollInterval != 100*time.Millisecond {
-		t.Errorf("TriggerPollInterval: got %v, want %v", cfg.TriggerPollInterval, 100*time.Millisecond)
-	}
-	if cfg.TriggerBatchSize != 100 {
-		t.Errorf("TriggerBatchSize: got %d, want %d", cfg.TriggerBatchSize, 100)
-	}
 }
 
 func TestLoad_CustomValues(t *testing.T) {
@@ -45,15 +36,11 @@ func TestLoad_CustomValues(t *testing.T) {
 	os.Setenv("PORT", "9090")
 	os.Setenv("NUM_SHARDS", "128")
 	os.Setenv("LOG_LEVEL", "debug")
-	os.Setenv("TRIGGER_POLL_INTERVAL", "500ms")
-	os.Setenv("TRIGGER_BATCH_SIZE", "50")
 	defer func() {
 		os.Unsetenv("SHARD_CONFIG_PATH")
 		os.Unsetenv("PORT")
 		os.Unsetenv("NUM_SHARDS")
 		os.Unsetenv("LOG_LEVEL")
-		os.Unsetenv("TRIGGER_POLL_INTERVAL")
-		os.Unsetenv("TRIGGER_BATCH_SIZE")
 	}()
 
 	cfg := Load()
@@ -69,12 +56,6 @@ func TestLoad_CustomValues(t *testing.T) {
 	}
 	if cfg.LogLevel != "debug" {
 		t.Errorf("LogLevel: got %q", cfg.LogLevel)
-	}
-	if cfg.TriggerPollInterval != 500*time.Millisecond {
-		t.Errorf("TriggerPollInterval: got %v", cfg.TriggerPollInterval)
-	}
-	if cfg.TriggerBatchSize != 50 {
-		t.Errorf("TriggerBatchSize: got %d", cfg.TriggerBatchSize)
 	}
 }
 

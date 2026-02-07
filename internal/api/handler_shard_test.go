@@ -8,11 +8,12 @@ import (
 
 	"github.com/ryanbastic/go-mezzanine/internal/index"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
+	"github.com/ryanbastic/go-mezzanine/internal/trigger"
 )
 
 func TestGetShardCount(t *testing.T) {
 	const numShards = 16
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), numShards)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, numShards)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/shards/count", nil)
 	w := httptest.NewRecorder()

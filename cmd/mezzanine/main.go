@@ -15,6 +15,7 @@ import (
 	"github.com/ryanbastic/go-mezzanine/internal/index"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 	"github.com/ryanbastic/go-mezzanine/internal/storage"
+	"github.com/ryanbastic/go-mezzanine/internal/trigger"
 )
 
 func main() {
@@ -82,24 +83,25 @@ func main() {
 
 	// Build shard-to-pool mapping and register stores
 	router := shard.NewRouter()
-	stores := make(map[shard.ID]storage.CellStore, cfg.NumShards)
-	shardPools := make(map[shard.ID]*pgxpool.Pool, cfg.NumShards)
 
 	for _, b := range shardCfg.Backends {
 		pool := pools[b.Name]
 		for i := b.ShardStart; i <= b.ShardEnd; i++ {
 			s := storage.NewPostgresStore(pool, i)
 			router.Register(shard.ID(i), s)
-			stores[shard.ID(i)] = s
-			shardPools[shard.ID(i)] = pool
 		}
 	}
 
 	// Initialize index registry
 	indexRegistry := index.NewRegistry()
 
+	// Initialize trigger plugin system
+	pluginRegistry := trigger.NewPluginRegistry()
+	rpcClient := trigger.NewRPCClient(cfg.TriggerRetryMax, cfg.TriggerRetryBackoff, cfg.TriggerRPCTimeout)
+	notifier := trigger.NewNotifier(pluginRegistry, rpcClient, logger)
+
 	// Start HTTP server
-	handler := api.NewServer(logger, router, indexRegistry, cfg.NumShards)
+	handler := api.NewServer(logger, router, indexRegistry, pluginRegistry, notifier, cfg.NumShards)
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: handler,

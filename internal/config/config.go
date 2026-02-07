@@ -14,8 +14,9 @@ type Config struct {
 	LogLevel    string
 
 	// Trigger framework
-	TriggerPollInterval time.Duration
-	TriggerBatchSize    int
+	TriggerRetryMax     int
+	TriggerRetryBackoff time.Duration
+	TriggerRPCTimeout   time.Duration
 
 }
 
@@ -25,8 +26,9 @@ func Load() Config {
 		Port:                getEnv("PORT", "8080"),
 		NumShards:           getEnvInt("NUM_SHARDS", 64),
 		LogLevel:            getEnv("LOG_LEVEL", "info"),
-		TriggerPollInterval: getEnvDuration("TRIGGER_POLL_INTERVAL", 100*time.Millisecond),
-		TriggerBatchSize:    getEnvInt("TRIGGER_BATCH_SIZE", 100),
+		TriggerRetryMax:     getEnvInt("TRIGGER_RETRY_MAX", 3),
+		TriggerRetryBackoff: getEnvDuration("TRIGGER_RETRY_BACKOFF", 100*time.Millisecond),
+		TriggerRPCTimeout:   getEnvDuration("TRIGGER_RPC_TIMEOUT", 5*time.Second),
 	}
 }
 

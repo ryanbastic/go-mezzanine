@@ -12,10 +12,11 @@ import (
 	"github.com/ryanbastic/go-mezzanine/internal/cell"
 	"github.com/ryanbastic/go-mezzanine/internal/index"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
+	"github.com/ryanbastic/go-mezzanine/internal/trigger"
 )
 
 func TestQueryIndex_InvalidShardKey(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/index/test_idx/not-a-uuid", nil)
 	w := httptest.NewRecorder()
@@ -28,7 +29,7 @@ func TestQueryIndex_InvalidShardKey(t *testing.T) {
 }
 
 func TestQueryIndex_IndexNotFound(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
 
 	shardKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/index/nonexistent/"+shardKey.String(), nil)
@@ -52,7 +53,7 @@ func TestNewIndexHandler(t *testing.T) {
 // --- Integration tests ---
 
 func TestServer_HealthEndpoint(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	w := httptest.NewRecorder()
@@ -73,7 +74,7 @@ func TestServer_HealthEndpoint(t *testing.T) {
 }
 
 func TestServer_HasRequestID(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	w := httptest.NewRecorder()
@@ -86,7 +87,7 @@ func TestServer_HasRequestID(t *testing.T) {
 }
 
 func TestServer_NotFound(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -105,7 +106,7 @@ func TestServer_WriteAndGetCell(t *testing.T) {
 		shardRouter.Register(shard.ID(i), store)
 	}
 
-	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), 64)
+	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
 
 	// Write a cell
 	rowKey := uuid.New()
@@ -156,7 +157,7 @@ func TestServer_GetRow_Integration(t *testing.T) {
 		shardRouter.Register(shard.ID(i), store)
 	}
 
-	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), 64)
+	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String(), nil)
 	w := httptest.NewRecorder()
@@ -168,7 +169,7 @@ func TestServer_GetRow_Integration(t *testing.T) {
 }
 
 func TestServer_OpenAPISpec(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
 	w := httptest.NewRecorder()

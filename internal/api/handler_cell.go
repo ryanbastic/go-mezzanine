@@ -13,6 +13,7 @@ import (
 	"github.com/ryanbastic/go-mezzanine/internal/cell"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 	"github.com/ryanbastic/go-mezzanine/internal/storage"
+	"github.com/ryanbastic/go-mezzanine/internal/trigger"
 )
 
 // --- Huma Input/Output types ---
@@ -90,11 +91,12 @@ type PartitionReadOutput struct {
 type CellHandler struct {
 	router    *shard.Router
 	numShards int
+	notifier  *trigger.Notifier
 	logger    *slog.Logger
 }
 
-func NewCellHandler(router *shard.Router, numShards int, logger *slog.Logger) *CellHandler {
-	return &CellHandler{router: router, numShards: numShards, logger: logger}
+func NewCellHandler(router *shard.Router, numShards int, notifier *trigger.Notifier, logger *slog.Logger) *CellHandler {
+	return &CellHandler{router: router, numShards: numShards, notifier: notifier, logger: logger}
 }
 
 func registerCellRoutes(api huma.API, h *CellHandler) {
@@ -159,6 +161,10 @@ func (h *CellHandler) WriteCell(ctx context.Context, input *WriteCellInput) (*Wr
 	if err != nil {
 		h.logger.Error("failed to write cell", "row_key", req.RowKey, "column_name", req.ColumnName, "error", err)
 		return nil, huma.Error500InternalServerError("failed to write cell")
+	}
+
+	if h.notifier != nil {
+		h.notifier.NotifyCell(int(shardID), c)
 	}
 
 	return &WriteCellOutput{Body: cellToResponse(c)}, nil

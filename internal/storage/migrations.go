@@ -36,20 +36,6 @@ func RunMigrationsForPool(ctx context.Context, pool *pgxpool.Pool, shardStart, s
 		}
 	}
 
-	checkpointDDL := `
-		CREATE TABLE IF NOT EXISTS trigger_checkpoints (
-			shard_id      INT NOT NULL,
-			column_name   TEXT NOT NULL,
-			last_added_id BIGINT NOT NULL DEFAULT 0,
-			updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-			PRIMARY KEY (shard_id, column_name)
-		);
-	`
-	if _, err := pool.Exec(ctx, checkpointDDL); err != nil {
-		return fmt.Errorf("migrate trigger_checkpoints: %w", err)
-	}
-
 	return nil
 }
 
