@@ -2,7 +2,7 @@
 
 A Go implementation of [Uber's Schemaless](https://www.uber.com/blog/schemaless-part-one-mysql-datastore/) datastore — an immutable, versioned, cell-based storage system backed by PostgreSQL.
 
-Mezzanine stores data as JSON cells addressed by three coordinates: **row key** (UUID), **column name** (string), and **ref key** (version number). It supports hash-based sharding, secondary indexes, an event-driven trigger framework, and a circuit breaker for resilience.
+Mezzanine stores data as JSON cells addressed by three coordinates: **row key** (UUID), **column name** (string), and **ref key** (version number). It supports hash-based sharding, secondary indexes, and an event-driven trigger framework.
 
 The HTTP API is built with [Huma](https://huma.rocks/), which auto-generates an OpenAPI 3.1 spec from the Go handler types. A generated Go client is included for programmatic access.
 
@@ -46,7 +46,6 @@ Shards are distributed across multiple PostgreSQL backends. Each backend owns a 
 | `internal/api` | Huma HTTP handlers, middleware, and route registration |
 | `internal/index` | Secondary index support |
 | `internal/trigger` | Event-driven trigger framework with checkpointing |
-| `internal/circuitbreaker` | Circuit breaker resilience pattern |
 | `internal/config` | Environment-based configuration |
 | `pkg/mezzanine` | Generated Go client (from OpenAPI spec) |
 
