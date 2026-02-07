@@ -35,7 +35,7 @@ func main() {
 	}
 
 	seedUsers(ctx, client, baseURL, users)
-	partitionRead(ctx, client)
+	//partitionRead(ctx, client)
 }
 
 func partitionRead(ctx context.Context, client *mezzanine.APIClient) {
@@ -49,8 +49,6 @@ func partitionRead(ctx context.Context, client *mezzanine.APIClient) {
 
 	readTypeAddedID := int64(storage.PartitionReadTypeAddedID)
 	for i := 0; i < int(numShards.NumShards); i++ {
-		fmt.Printf("  Reading partition %d...\n", i)
-
 		partReadReq := client.CellsAPI.PartitionRead(ctx).
 			AddedId(0).
 			Limit(100).
@@ -63,7 +61,7 @@ func partitionRead(ctx context.Context, client *mezzanine.APIClient) {
 		}
 
 		for _, cell := range cells {
-			fmt.Printf("    [cell] row_key=%s  column_name=%s  ref_key=%d body=%+v added_id=%d\n", cell.GetRowKey(), cell.GetColumnName(), cell.GetRefKey(), cell.GetBody(), cell.GetAddedId())
+			fmt.Printf(" part:%d   [cell] row_key=%s  column_name=%s  ref_key=%d body=%+v added_id=%d\n", i, cell.GetRowKey(), cell.GetColumnName(), cell.GetRefKey(), cell.GetBody(), cell.GetAddedId())
 		}
 	}
 }

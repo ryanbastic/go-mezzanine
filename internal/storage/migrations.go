@@ -7,8 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// RunMigrationsForPool creates shard cell tables for the given range and the
-// trigger checkpoint table on a single backend pool.
+// RunMigrationsForPool creates shard cell tables for the given range
 func RunMigrationsForPool(ctx context.Context, pool *pgxpool.Pool, shardStart, shardEnd int) error {
 	for i := shardStart; i <= shardEnd; i++ {
 		table := ShardTable(i)

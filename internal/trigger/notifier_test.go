@@ -27,12 +27,12 @@ func TestNotifier_DispatchesToSubscribedPlugins(t *testing.T) {
 	defer srv.Close()
 
 	registry := NewPluginRegistry()
-	registry.Register(&Plugin{
+	registry.Register(&Plugin{ //nolint:errcheck
 		Name:              "plugin-a",
 		Endpoint:          srv.URL,
 		SubscribedColumns: []string{"profile"},
 	})
-	registry.Register(&Plugin{
+	registry.Register(&Plugin{ //nolint:errcheck
 		Name:              "plugin-b",
 		Endpoint:          srv.URL,
 		SubscribedColumns: []string{"profile", "settings"},
@@ -73,7 +73,7 @@ func TestNotifier_SkipsUnsubscribedPlugins(t *testing.T) {
 	defer srv.Close()
 
 	registry := NewPluginRegistry()
-	registry.Register(&Plugin{
+	registry.Register(&Plugin{ //nolint:errcheck
 		Name:              "settings-only",
 		Endpoint:          srv.URL,
 		SubscribedColumns: []string{"settings"},
@@ -117,7 +117,7 @@ func TestNotifier_LogsRPCErrors(t *testing.T) {
 	}), nil)
 
 	registry := NewPluginRegistry()
-	registry.Register(&Plugin{
+	registry.Register(&Plugin{ //nolint:errcheck
 		Name:              "failing",
 		Endpoint:          srv.URL,
 		SubscribedColumns: []string{"profile"},

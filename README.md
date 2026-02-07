@@ -45,7 +45,7 @@ Shards are distributed across multiple PostgreSQL backends. Each backend owns a 
 | `internal/storage` | PostgreSQL persistence and migrations |
 | `internal/api` | Huma HTTP handlers, middleware, and route registration |
 | `internal/index` | Secondary index support |
-| `internal/trigger` | Event-driven trigger framework with checkpointing |
+| `internal/trigger` | Event-driven trigger framework |
 | `internal/config` | Environment-based configuration |
 | `pkg/mezzanine` | Generated Go client (from OpenAPI spec) |
 

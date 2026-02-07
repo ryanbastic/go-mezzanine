@@ -107,7 +107,9 @@ func (h *PluginHandler) RegisterPlugin(ctx context.Context, input *RegisterPlugi
 		Endpoint:          input.Body.Endpoint,
 		SubscribedColumns: input.Body.SubscribedColumns,
 	}
-	h.registry.Register(p)
+	if err := h.registry.Register(p); err != nil {
+		return nil, huma.Error409Conflict(err.Error())
+	}
 
 	h.logger.Info("plugin registered", "id", p.ID, "name", p.Name, "endpoint", p.Endpoint)
 

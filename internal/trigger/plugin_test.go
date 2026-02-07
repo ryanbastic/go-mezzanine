@@ -13,7 +13,9 @@ func TestPluginRegistry_RegisterAndGet(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile", "settings"},
 	}
-	r.Register(p)
+	if err := r.Register(p); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
 
 	if p.ID == uuid.Nil {
 		t.Fatal("expected ID to be assigned")
@@ -42,10 +44,35 @@ func TestPluginRegistry_GetNotFound(t *testing.T) {
 	}
 }
 
+func TestPluginRegistry_RegisterDuplicate(t *testing.T) {
+	r := NewPluginRegistry()
+	p := &Plugin{
+		Name:              "dup-plugin",
+		Endpoint:          "http://localhost:9000/rpc",
+		SubscribedColumns: []string{"profile"},
+	}
+	if err := r.Register(p); err != nil {
+		t.Fatalf("first Register: %v", err)
+	}
+
+	dup := &Plugin{
+		Name:              "dup-plugin",
+		Endpoint:          "http://localhost:9001/rpc",
+		SubscribedColumns: []string{"settings"},
+	}
+	if err := r.Register(dup); err == nil {
+		t.Fatal("expected error for duplicate plugin name")
+	}
+
+	if len(r.List()) != 1 {
+		t.Errorf("expected 1 plugin, got %d", len(r.List()))
+	}
+}
+
 func TestPluginRegistry_List(t *testing.T) {
 	r := NewPluginRegistry()
-	r.Register(&Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"x"}})
-	r.Register(&Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"y"}})
+	r.Register(&Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"x"}})  //nolint:errcheck
+	r.Register(&Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"y"}})  //nolint:errcheck
 
 	list := r.List()
 	if len(list) != 2 {
@@ -56,7 +83,9 @@ func TestPluginRegistry_List(t *testing.T) {
 func TestPluginRegistry_Delete(t *testing.T) {
 	r := NewPluginRegistry()
 	p := &Plugin{Name: "del", Endpoint: "http://del/rpc", SubscribedColumns: []string{"x"}}
-	r.Register(p)
+	if err := r.Register(p); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
 
 	if err := r.Delete(p.ID); err != nil {
 		t.Fatalf("Delete: %v", err)
@@ -75,9 +104,9 @@ func TestPluginRegistry_DeleteNotFound(t *testing.T) {
 
 func TestPluginRegistry_ForColumn(t *testing.T) {
 	r := NewPluginRegistry()
-	r.Register(&Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"profile", "settings"}})
-	r.Register(&Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"profile"}})
-	r.Register(&Plugin{Name: "c", Endpoint: "http://c/rpc", SubscribedColumns: []string{"orders"}, Status: PluginStatusInactive})
+	r.Register(&Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"profile", "settings"}})  //nolint:errcheck
+	r.Register(&Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"profile"}})              //nolint:errcheck
+	r.Register(&Plugin{Name: "c", Endpoint: "http://c/rpc", SubscribedColumns: []string{"orders"}, Status: PluginStatusInactive}) //nolint:errcheck
 
 	got := r.ForColumn("profile")
 	if len(got) != 2 {
@@ -97,9 +126,9 @@ func TestPluginRegistry_ForColumn(t *testing.T) {
 
 func TestPluginRegistry_Columns(t *testing.T) {
 	r := NewPluginRegistry()
-	r.Register(&Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"profile", "settings"}})
-	r.Register(&Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"profile", "orders"}})
-	r.Register(&Plugin{Name: "c", Endpoint: "http://c/rpc", SubscribedColumns: []string{"hidden"}, Status: PluginStatusInactive})
+	r.Register(&Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"profile", "settings"}})                    //nolint:errcheck
+	r.Register(&Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"profile", "orders"}})                    //nolint:errcheck
+	r.Register(&Plugin{Name: "c", Endpoint: "http://c/rpc", SubscribedColumns: []string{"hidden"}, Status: PluginStatusInactive}) //nolint:errcheck
 
 	cols := r.Columns()
 	colSet := make(map[string]bool)

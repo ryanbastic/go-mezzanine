@@ -39,15 +39,22 @@ func NewPluginRegistry() *PluginRegistry {
 }
 
 // Register adds a plugin to the registry. It assigns an ID and creation timestamp.
-func (r *PluginRegistry) Register(p *Plugin) {
+// It returns an error if a plugin with the same name is already registered.
+func (r *PluginRegistry) Register(p *Plugin) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	for _, existing := range r.plugins {
+		if existing.Name == p.Name {
+			return fmt.Errorf("plugin %q already registered", p.Name)
+		}
+	}
 	p.ID = uuid.New()
 	p.CreatedAt = time.Now()
 	if p.Status == "" {
 		p.Status = PluginStatusActive
 	}
 	r.plugins[p.ID] = p
+	return nil
 }
 
 // Get returns a plugin by ID.

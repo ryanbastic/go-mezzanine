@@ -53,6 +53,38 @@ func TestRegisterPlugin_Success(t *testing.T) {
 	}
 }
 
+func TestRegisterPlugin_DuplicateName(t *testing.T) {
+	server := setupPluginTestServer()
+
+	body := map[string]any{
+		"name":               "dup-plugin",
+		"endpoint":           "http://localhost:9000/rpc",
+		"subscribed_columns": []string{"profile"},
+	}
+	data, _ := json.Marshal(body)
+
+	// First registration should succeed
+	req := httptest.NewRequest(http.MethodPost, "/v1/plugins", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	server.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("first register: got %d, want %d\nbody: %s", w.Code, http.StatusCreated, w.Body.String())
+	}
+
+	// Second registration with same name should return 409
+	data, _ = json.Marshal(body)
+	req = httptest.NewRequest(http.MethodPost, "/v1/plugins", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	server.ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("duplicate register: got %d, want %d\nbody: %s", w.Code, http.StatusConflict, w.Body.String())
+	}
+}
+
 func TestRegisterPlugin_MissingName(t *testing.T) {
 	server := setupPluginTestServer()
 
@@ -162,7 +194,9 @@ func TestGetPlugin_Success(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile"},
 	}
-	registry.Register(p)
+	if err := registry.Register(p); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/plugins/"+p.ID.String(), nil)
 	w := httptest.NewRecorder()
@@ -214,7 +248,9 @@ func TestDeletePlugin_Success(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile"},
 	}
-	registry.Register(p)
+	if err := registry.Register(p); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/plugins/"+p.ID.String(), nil)
 	w := httptest.NewRecorder()
