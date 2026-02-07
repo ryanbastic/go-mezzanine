@@ -4,7 +4,7 @@ build:
 	go build -o bin/mezzanine ./cmd/mezzanine
 
 run: build
-	SHARD_CONFIG_PATH=shards.json ./bin/mezzanine
+	NUM_SHARDS=4096 SHARD_CONFIG_PATH=shards.json ./bin/mezzanine
 
 test:
 	go test ./...

@@ -4,13 +4,13 @@
       "name": "db1",
       "database_url": "postgres://postgres:postgres@localhost:5432/mezzanine?sslmode=disable",
       "shard_start": 0,
-      "shard_end": 31
+      "shard_end": 2047
     },
     {
       "name": "db2",
       "database_url": "postgres://postgres:postgres@localhost:5433/mezzanine?sslmode=disable",
-      "shard_start": 32,
-      "shard_end": 63
+      "shard_start": 2048,
+      "shard_end": 4095
     }
   ]
 }
