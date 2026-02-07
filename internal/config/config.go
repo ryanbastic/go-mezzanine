@@ -17,9 +17,6 @@ type Config struct {
 	TriggerPollInterval time.Duration
 	TriggerBatchSize    int
 
-	// Circuit breaker
-	CBMaxFailures  int
-	CBResetTimeout time.Duration
 }
 
 func Load() Config {
@@ -30,8 +27,6 @@ func Load() Config {
 		LogLevel:            getEnv("LOG_LEVEL", "info"),
 		TriggerPollInterval: getEnvDuration("TRIGGER_POLL_INTERVAL", 100*time.Millisecond),
 		TriggerBatchSize:    getEnvInt("TRIGGER_BATCH_SIZE", 100),
-		CBMaxFailures:       getEnvInt("CB_MAX_FAILURES", 5),
-		CBResetTimeout:      getEnvDuration("CB_RESET_TIMEOUT", 30*time.Second),
 	}
 }
 

@@ -17,8 +17,6 @@ func TestLoad_Defaults(t *testing.T) {
 	os.Unsetenv("LOG_LEVEL")
 	os.Unsetenv("TRIGGER_POLL_INTERVAL")
 	os.Unsetenv("TRIGGER_BATCH_SIZE")
-	os.Unsetenv("CB_MAX_FAILURES")
-	os.Unsetenv("CB_RESET_TIMEOUT")
 
 	cfg := Load()
 
@@ -40,12 +38,6 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.TriggerBatchSize != 100 {
 		t.Errorf("TriggerBatchSize: got %d, want %d", cfg.TriggerBatchSize, 100)
 	}
-	if cfg.CBMaxFailures != 5 {
-		t.Errorf("CBMaxFailures: got %d, want %d", cfg.CBMaxFailures, 5)
-	}
-	if cfg.CBResetTimeout != 30*time.Second {
-		t.Errorf("CBResetTimeout: got %v, want %v", cfg.CBResetTimeout, 30*time.Second)
-	}
 }
 
 func TestLoad_CustomValues(t *testing.T) {
@@ -55,8 +47,6 @@ func TestLoad_CustomValues(t *testing.T) {
 	os.Setenv("LOG_LEVEL", "debug")
 	os.Setenv("TRIGGER_POLL_INTERVAL", "500ms")
 	os.Setenv("TRIGGER_BATCH_SIZE", "50")
-	os.Setenv("CB_MAX_FAILURES", "10")
-	os.Setenv("CB_RESET_TIMEOUT", "1m")
 	defer func() {
 		os.Unsetenv("SHARD_CONFIG_PATH")
 		os.Unsetenv("PORT")
@@ -64,8 +54,6 @@ func TestLoad_CustomValues(t *testing.T) {
 		os.Unsetenv("LOG_LEVEL")
 		os.Unsetenv("TRIGGER_POLL_INTERVAL")
 		os.Unsetenv("TRIGGER_BATCH_SIZE")
-		os.Unsetenv("CB_MAX_FAILURES")
-		os.Unsetenv("CB_RESET_TIMEOUT")
 	}()
 
 	cfg := Load()
@@ -87,12 +75,6 @@ func TestLoad_CustomValues(t *testing.T) {
 	}
 	if cfg.TriggerBatchSize != 50 {
 		t.Errorf("TriggerBatchSize: got %d", cfg.TriggerBatchSize)
-	}
-	if cfg.CBMaxFailures != 10 {
-		t.Errorf("CBMaxFailures: got %d", cfg.CBMaxFailures)
-	}
-	if cfg.CBResetTimeout != time.Minute {
-		t.Errorf("CBResetTimeout: got %v", cfg.CBResetTimeout)
 	}
 }
 

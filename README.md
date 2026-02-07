@@ -80,8 +80,6 @@ All settings are configured via environment variables:
 | `LOG_LEVEL` | `info` | Log level (`debug`, `info`, `warn`, `error`) |
 | `TRIGGER_POLL_INTERVAL` | `100ms` | How often triggers poll for new cells |
 | `TRIGGER_BATCH_SIZE` | `100` | Max cells processed per trigger poll |
-| `CB_MAX_FAILURES` | `5` | Circuit breaker failure threshold |
-| `CB_RESET_TIMEOUT` | `30s` | Circuit breaker recovery timeout |
 
 ### Shard Configuration
 
