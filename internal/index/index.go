@@ -105,7 +105,7 @@ func NewRegistry() *Registry {
 func (r *Registry) Register(pool *pgxpool.Pool, def Definition, numShards int) {
 	r.definitions[def.Name] = def
 	shardStores := make(map[shard.ID]*Store, numShards)
-	for i := 0; i < numShards; i++ {
+	for i := range numShards {
 		shardStores[shard.ID(i)] = NewStore(pool, def.Name, i)
 	}
 	r.stores[def.Name] = shardStores
@@ -130,7 +130,7 @@ func (r *Registry) GetDefinition(indexName string) (Definition, bool) {
 // CreateTables creates the index tables for all registered indexes.
 func (r *Registry) CreateTables(ctx context.Context, pool *pgxpool.Pool, numShards int) error {
 	for indexName := range r.definitions {
-		for i := 0; i < numShards; i++ {
+		for i := range numShards {
 			table := IndexTable(indexName, i)
 			ddl := fmt.Sprintf(`
 				CREATE TABLE IF NOT EXISTS %s (

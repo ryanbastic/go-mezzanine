@@ -7,6 +7,7 @@ Method | HTTP request | Description
 [**GetCell**](CellsAPI.md#GetCell) | **Get** /v1/cells/{row_key}/{column_name}/{ref_key} | Get exact cell version
 [**GetCellLatest**](CellsAPI.md#GetCellLatest) | **Get** /v1/cells/{row_key}/{column_name} | Get latest cell version
 [**GetRow**](CellsAPI.md#GetRow) | **Get** /v1/cells/{row_key} | Get all latest cells for a row
+[**PartitionRead**](CellsAPI.md#PartitionRead) | **Get** /v1/cells/partitionRead | Read a partition of cells
 [**WriteCell**](CellsAPI.md#WriteCell) | **Post** /v1/cells | Write a cell
 
 
@@ -209,6 +210,79 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**RowResponse**](RowResponse.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## PartitionRead
+
+> []CellResponse PartitionRead(ctx).PartitionNumber(partitionNumber).ReadType(readType).CreatedAfter(createdAfter).AddedId(addedId).Limit(limit).Execute()
+
+Read a partition of cells
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+    "time"
+	openapiclient "github.com/ryanbastic/go-mezzanine/pkg/mezzanine"
+)
+
+func main() {
+	partitionNumber := int64(789) // int64 | Partition number
+	readType := int64(789) // int64 | Read type
+	createdAfter := time.Now() // time.Time | Filter cells created after this timestamp (optional)
+	addedId := int64(789) // int64 | Filter cells added after ID (optional)
+	limit := int64(789) // int64 | Maximum number of cells to return (optional)
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.CellsAPI.PartitionRead(context.Background()).PartitionNumber(partitionNumber).ReadType(readType).CreatedAfter(createdAfter).AddedId(addedId).Limit(limit).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CellsAPI.PartitionRead``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `PartitionRead`: []CellResponse
+	fmt.Fprintf(os.Stdout, "Response from `CellsAPI.PartitionRead`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiPartitionReadRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **partitionNumber** | **int64** | Partition number | 
+ **readType** | **int64** | Read type | 
+ **createdAfter** | **time.Time** | Filter cells created after this timestamp | 
+ **addedId** | **int64** | Filter cells added after ID | 
+ **limit** | **int64** | Maximum number of cells to return | 
+
+### Return type
+
+[**[]CellResponse**](CellResponse.md)
 
 ### Authorization
 

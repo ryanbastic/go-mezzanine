@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/ryanbastic/go-mezzanine/internal/cell"
@@ -24,6 +25,9 @@ type CellStore interface {
 
 	// GetRow returns the latest cell for every column_name in a row.
 	GetRow(ctx context.Context, rowKey uuid.UUID) ([]cell.Cell, error)
+
+	// PartitionRead reads a partition of cells.
+	PartitionRead(ctx context.Context, partitionNumber int, readType int, addedID int64, createdAfter time.Time, limit int) ([]cell.Cell, error)
 
 	// ScanCells returns cells with added_id > afterAddedID for a given column,
 	// ordered by added_id ASC. Used by the trigger framework.

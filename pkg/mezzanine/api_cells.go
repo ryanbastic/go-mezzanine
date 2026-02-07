@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 
@@ -300,6 +301,163 @@ func (a *CellsAPIService) GetRowExecute(r ApiGetRowRequest) (*RowResponse, *http
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v ErrorModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiPartitionReadRequest struct {
+	ctx context.Context
+	ApiService *CellsAPIService
+	partitionNumber *int64
+	readType *int64
+	createdAfter *time.Time
+	addedId *int64
+	limit *int64
+}
+
+// Partition number
+func (r ApiPartitionReadRequest) PartitionNumber(partitionNumber int64) ApiPartitionReadRequest {
+	r.partitionNumber = &partitionNumber
+	return r
+}
+
+// Read type
+func (r ApiPartitionReadRequest) ReadType(readType int64) ApiPartitionReadRequest {
+	r.readType = &readType
+	return r
+}
+
+// Filter cells created after this timestamp
+func (r ApiPartitionReadRequest) CreatedAfter(createdAfter time.Time) ApiPartitionReadRequest {
+	r.createdAfter = &createdAfter
+	return r
+}
+
+// Filter cells added after ID
+func (r ApiPartitionReadRequest) AddedId(addedId int64) ApiPartitionReadRequest {
+	r.addedId = &addedId
+	return r
+}
+
+// Maximum number of cells to return
+func (r ApiPartitionReadRequest) Limit(limit int64) ApiPartitionReadRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiPartitionReadRequest) Execute() ([]CellResponse, *http.Response, error) {
+	return r.ApiService.PartitionReadExecute(r)
+}
+
+/*
+PartitionRead Read a partition of cells
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiPartitionReadRequest
+*/
+func (a *CellsAPIService) PartitionRead(ctx context.Context) ApiPartitionReadRequest {
+	return ApiPartitionReadRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return []CellResponse
+func (a *CellsAPIService) PartitionReadExecute(r ApiPartitionReadRequest) ([]CellResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  []CellResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CellsAPIService.PartitionRead")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/cells/partitionRead"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.partitionNumber == nil {
+		return localVarReturnValue, nil, reportError("partitionNumber is required and must be specified")
+	}
+	if r.readType == nil {
+		return localVarReturnValue, nil, reportError("readType is required and must be specified")
+	}
+
+	parameterAddToHeaderOrQuery(localVarQueryParams, "partition_number", r.partitionNumber, "form", "")
+	parameterAddToHeaderOrQuery(localVarQueryParams, "read_type", r.readType, "form", "")
+	if r.createdAfter != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "created_after", r.createdAfter, "form", "")
+	}
+	if r.addedId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "added_id", r.addedId, "form", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "form", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

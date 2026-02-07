@@ -1,11 +1,11 @@
 .gitignore
-.openapi-generator-ignore
 .travis.yml
 README.md
 api/openapi.yaml
 api_cells.go
 api_health.go
 api_index.go
+api_shards.go
 client.go
 configuration.go
 docs/CellResponse.md
@@ -17,6 +17,8 @@ docs/HealthResponse.md
 docs/IndexAPI.md
 docs/IndexEntryResponse.md
 docs/RowResponse.md
+docs/ShardCountResponse.md
+docs/ShardsAPI.md
 docs/WriteCellBody.md
 git_push.sh
 go.mod
@@ -27,9 +29,7 @@ model_error_model.go
 model_health_response.go
 model_index_entry_response.go
 model_row_response.go
+model_shard_count_response.go
 model_write_cell_body.go
 response.go
-test/api_cells_test.go
-test/api_health_test.go
-test/api_index_test.go
 utils.go

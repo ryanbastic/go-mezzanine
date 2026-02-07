@@ -54,6 +54,8 @@ type APIClient struct {
 	HealthAPI *HealthAPIService
 
 	IndexAPI *IndexAPIService
+
+	ShardsAPI *ShardsAPIService
 }
 
 type service struct {
@@ -75,6 +77,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.CellsAPI = (*CellsAPIService)(&c.common)
 	c.HealthAPI = (*HealthAPIService)(&c.common)
 	c.IndexAPI = (*IndexAPIService)(&c.common)
+	c.ShardsAPI = (*ShardsAPIService)(&c.common)
 
 	return c
 }

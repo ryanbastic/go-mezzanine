@@ -31,6 +31,79 @@ paths:
       summary: Write a cell
       tags:
       - cells
+  /v1/cells/partitionRead:
+    get:
+      operationId: partition-read
+      parameters:
+      - description: Partition number
+        explode: false
+        in: query
+        name: partition_number
+        required: true
+        schema:
+          description: Partition number
+          format: int64
+          type: integer
+        style: form
+      - description: Read type
+        explode: false
+        in: query
+        name: read_type
+        required: true
+        schema:
+          description: Read type
+          format: int64
+          type: integer
+        style: form
+      - description: Filter cells created after this timestamp
+        explode: false
+        in: query
+        name: created_after
+        required: false
+        schema:
+          description: Filter cells created after this timestamp
+          format: date-time
+          type: string
+        style: form
+      - description: Filter cells added after ID
+        explode: false
+        in: query
+        name: added_id
+        required: false
+        schema:
+          description: Filter cells added after ID
+          format: int64
+          type: integer
+        style: form
+      - description: Maximum number of cells to return
+        explode: false
+        in: query
+        name: limit
+        required: false
+        schema:
+          description: Maximum number of cells to return
+          format: int64
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CellResponse'
+                nullable: true
+                type: array
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+          description: Error
+      summary: Read a partition of cells
+      tags:
+      - cells
   /v1/cells/{row_key}:
     get:
       operationId: get-row
@@ -210,6 +283,25 @@ paths:
       summary: Query secondary index
       tags:
       - index
+  /v1/shards/count:
+    get:
+      operationId: get-shard-count
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShardCountResponse'
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+          description: Error
+      summary: Get shard count
+      tags:
+      - shards
 components:
   schemas:
     CellResponse:
@@ -384,6 +476,23 @@ components:
       required:
       - cells
       - row_key
+    ShardCountResponse:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        num_shards: 0
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        num_shards:
+          description: Number of configured shards
+          format: int64
+          type: integer
+      required:
+      - num_shards
     WriteCellBody:
       additionalProperties: false
       example:

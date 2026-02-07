@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -29,6 +30,31 @@ func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.R
 	registerCellRoutes(api, cellHandler)
 	registerIndexRoutes(api, indexHandler)
 	registerHealthRoute(api)
+	registerShardRoutes(api, numShards)
 
 	return mux
+}
+
+// --- Shard Info ---
+
+type ShardCountInput struct{}
+
+type ShardCountResponse struct {
+	NumShards int `json:"num_shards" doc:"Number of configured shards" example:"64"`
+}
+
+type ShardCountOutput struct {
+	Body ShardCountResponse
+}
+
+func registerShardRoutes(api huma.API, numShards int) {
+	huma.Register(api, huma.Operation{
+		OperationID: "get-shard-count",
+		Method:      http.MethodGet,
+		Path:        "/v1/shards/count",
+		Summary:     "Get shard count",
+		Tags:        []string{"shards"},
+	}, func(ctx context.Context, input *ShardCountInput) (*ShardCountOutput, error) {
+		return &ShardCountOutput{Body: ShardCountResponse{NumShards: numShards}}, nil
+	})
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
+	"github.com/ryanbastic/go-mezzanine/internal/storage"
 	mezzanine "github.com/ryanbastic/go-mezzanine/pkg/mezzanine"
 )
 
@@ -32,6 +33,50 @@ func main() {
 		{Name: "Dave Brown", Email: "dave@example.com", Role: "editor"},
 		{Name: "Eve Davis", Email: "eve@example.com", Role: "admin"},
 	}
+
+	seedUsers(ctx, client, baseURL, users)
+	partitionRead(ctx, client)
+}
+
+func ptrTo[T any](v T) *T {
+	return &v
+}
+
+func partitionRead(ctx context.Context, client *mezzanine.APIClient) {
+	fmt.Printf("Testing partition read...\n")
+
+	numShards, _, err := client.ShardsAPI.GetShardCount(ctx).Execute()
+	if err != nil {
+		log.Fatalf("failed to get shard count: %v", err)
+	}
+	fmt.Printf("Number of shards: %d\n", numShards.NumShards)
+
+	readTypeAddedID := int64(storage.PartitionReadTypeAddedID)
+	for i := 0; i < int(numShards.NumShards); i++ {
+		fmt.Printf("  Reading partition %d...\n", i)
+
+		partReadReq := client.CellsAPI.PartitionRead(ctx).
+			AddedId(0).
+			Limit(100).
+			ReadType(readTypeAddedID).
+			PartitionNumber(int64(i))
+
+		cells, _, err := partReadReq.Execute()
+		if err != nil {
+			log.Fatalf("failed to read partition %d: %v", i, err)
+		}
+
+		for _, cell := range cells {
+			fmt.Printf("    [cell] row_key=%s  column_name=%s  ref_key=%d body=%+v added_id=%d\n", cell.GetRowKey(), cell.GetColumnName(), cell.GetRefKey(), cell.GetBody(), cell.GetAddedId())
+		}
+	}
+}
+
+func seedUsers(ctx context.Context, client *mezzanine.APIClient, baseURL string, users []struct {
+	Name  string
+	Email string
+	Role  string
+}) {
 
 	fmt.Printf("Seeding %d users to %s...\n", len(users), baseURL)
 
@@ -73,4 +118,5 @@ func main() {
 	}
 
 	fmt.Println("Done. Seeded all users.")
+
 }

@@ -73,6 +73,18 @@ type GetRowOutput struct {
 	Body RowResponse
 }
 
+type PartitionReadInput struct {
+	PartitionNumber   int       `query:"partition_number" doc:"Partition number" required:"true"`
+	PartitionReadType int       `query:"read_type" doc:"Read type" required:"true"`
+	CreatedAfter      time.Time `query:"created_after" doc:"Filter cells created after this timestamp" required:"false"`
+	AddedID           int64     `query:"added_id" doc:"Filter cells added after ID" required:"false"`
+	Limit             int       `query:"limit" doc:"Maximum number of cells to return" required:"false"`
+}
+
+type PartitionReadOutput struct {
+	Body []CellResponse
+}
+
 // --- Handler ---
 
 type CellHandler struct {
@@ -118,6 +130,14 @@ func registerCellRoutes(api huma.API, h *CellHandler) {
 		Summary:     "Get all latest cells for a row",
 		Tags:        []string{"cells"},
 	}, h.GetRow)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "partition-read",
+		Method:      http.MethodGet,
+		Path:        "/v1/cells/partitionRead",
+		Summary:     "Read a partition of cells",
+		Tags:        []string{"cells"},
+	}, h.PartitionRead)
 }
 
 func (h *CellHandler) WriteCell(ctx context.Context, input *WriteCellInput) (*WriteCellOutput, error) {
@@ -227,6 +247,41 @@ func (h *CellHandler) GetRow(ctx context.Context, input *GetRowInput) (*GetRowOu
 	}
 
 	return &GetRowOutput{Body: RowResponse{RowKey: rowKey, Cells: resp}}, nil
+}
+
+func (h *CellHandler) PartitionRead(ctx context.Context, input *PartitionReadInput) (*PartitionReadOutput, error) {
+	switch input.PartitionReadType {
+	case storage.PartitionReadTypeCreatedAt:
+		// Handle type1 partition read
+	case storage.PartitionReadTypeAddedID:
+		// Handle type2 partition read
+	default:
+		return nil, huma.Error400BadRequest("invalid partition type")
+	}
+
+	if input.PartitionNumber < 0 || input.PartitionNumber >= h.numShards {
+		h.logger.Error("invalid partition number", "partition_number", input.PartitionNumber)
+		return nil, huma.Error400BadRequest("invalid partition number")
+	}
+
+	store, err := h.router.StoreFor(shard.ID(input.PartitionNumber))
+	if err != nil {
+		h.logger.Error("shard routing failed", "partition_number", input.PartitionNumber, "error", err)
+		return nil, huma.Error500InternalServerError("shard routing failed")
+	}
+
+	cells, err := store.PartitionRead(ctx, input.PartitionNumber, input.PartitionReadType, input.AddedID, input.CreatedAfter, input.Limit)
+	if err != nil {
+		h.logger.Error("failed to read partition", "partition_number", input.PartitionNumber, "error", err)
+		return nil, huma.Error500InternalServerError("failed to read partition")
+	}
+
+	resp := make([]CellResponse, len(cells))
+	for i, c := range cells {
+		resp[i] = cellToResponse(&c)
+	}
+
+	return &PartitionReadOutput{Body: resp}, nil
 }
 
 func cellToResponse(c *cell.Cell) CellResponse {

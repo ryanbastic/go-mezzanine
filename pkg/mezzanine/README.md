@@ -81,9 +81,11 @@ Class | Method | HTTP request | Description
 *CellsAPI* | [**GetCell**](docs/CellsAPI.md#getcell) | **Get** /v1/cells/{row_key}/{column_name}/{ref_key} | Get exact cell version
 *CellsAPI* | [**GetCellLatest**](docs/CellsAPI.md#getcelllatest) | **Get** /v1/cells/{row_key}/{column_name} | Get latest cell version
 *CellsAPI* | [**GetRow**](docs/CellsAPI.md#getrow) | **Get** /v1/cells/{row_key} | Get all latest cells for a row
+*CellsAPI* | [**PartitionRead**](docs/CellsAPI.md#partitionread) | **Get** /v1/cells/partitionRead | Read a partition of cells
 *CellsAPI* | [**WriteCell**](docs/CellsAPI.md#writecell) | **Post** /v1/cells | Write a cell
 *HealthAPI* | [**HealthCheck**](docs/HealthAPI.md#healthcheck) | **Get** /v1/health | Health check
 *IndexAPI* | [**QueryIndex**](docs/IndexAPI.md#queryindex) | **Get** /v1/index/{index_name}/{shard_key} | Query secondary index
+*ShardsAPI* | [**GetShardCount**](docs/ShardsAPI.md#getshardcount) | **Get** /v1/shards/count | Get shard count
 
 
 ## Documentation For Models
@@ -94,6 +96,7 @@ Class | Method | HTTP request | Description
  - [HealthResponse](docs/HealthResponse.md)
  - [IndexEntryResponse](docs/IndexEntryResponse.md)
  - [RowResponse](docs/RowResponse.md)
+ - [ShardCountResponse](docs/ShardCountResponse.md)
  - [WriteCellBody](docs/WriteCellBody.md)
 
 

@@ -20,13 +20,13 @@ import (
 // --- Mock CellStore ---
 
 type mockCellStore struct {
-	cells      map[string]*cell.Cell
-	rows       map[string][]cell.Cell
-	writeErr   error
-	getErr     error
-	latestErr  error
-	rowErr     error
-	nextID     int64
+	cells     map[string]*cell.Cell
+	rows      map[string][]cell.Cell
+	writeErr  error
+	getErr    error
+	latestErr error
+	rowErr    error
+	nextID    int64
 }
 
 func newMockCellStore() *mockCellStore {
@@ -92,6 +92,10 @@ func (m *mockCellStore) GetRow(ctx context.Context, rowKey uuid.UUID) ([]cell.Ce
 		return nil, m.rowErr
 	}
 	return m.rows[rowKey.String()], nil
+}
+
+func (m *mockCellStore) PartitionRead(ctx context.Context, partitionNumber int, readType int, addedID int64, createdAfter time.Time, limit int) ([]cell.Cell, error) {
+	return nil, nil
 }
 
 func (m *mockCellStore) ScanCells(ctx context.Context, columnName string, afterAddedID int64, limit int) ([]cell.Cell, error) {

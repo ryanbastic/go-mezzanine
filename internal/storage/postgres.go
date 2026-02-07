@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -128,6 +129,62 @@ func (s *PostgresStore) ScanCells(ctx context.Context, columnName string, afterA
 		var c cell.Cell
 		if err := rows.Scan(&c.AddedID, &c.RowKey, &c.ColumnName, &c.RefKey, &c.Body, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan cells scan: %w", err)
+		}
+		cells = append(cells, c)
+	}
+	return cells, rows.Err()
+}
+
+type ReadType int
+
+const (
+	_                          = iota
+	PartitionReadTypeCreatedAt = 1
+	PartitionReadTypeAddedID   = 2
+)
+
+func (s *PostgresStore) PartitionRead(ctx context.Context, partitionNumber int, readType int, addedID int64, createdAfter time.Time, limit int) ([]cell.Cell, error) {
+	var query string
+
+	var rows pgx.Rows
+	var err error
+	switch readType {
+	case PartitionReadTypeCreatedAt:
+		// TODO FIXME $1::timestamp ?
+		query = fmt.Sprintf(`
+			SELECT added_id, row_key, column_name, ref_key, body, created_at
+			FROM %s
+			WHERE created_at > $1
+			ORDER BY created_at ASC
+			LIMIT $2
+		`, s.table)
+
+		rows, err = s.pool.Query(ctx, query, partitionNumber, createdAfter, limit)
+
+	case PartitionReadTypeAddedID:
+		query = fmt.Sprintf(`
+			SELECT added_id, row_key, column_name, ref_key, body, created_at
+			FROM %s
+			WHERE added_id > $1
+			ORDER BY added_id ASC
+			LIMIT $2
+		`, s.table)
+
+		rows, err = s.pool.Query(ctx, query, addedID, limit)
+	default:
+		return nil, fmt.Errorf("invalid read type: %d", readType)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("partition read: %w", err)
+	}
+	defer rows.Close()
+
+	var cells []cell.Cell
+	for rows.Next() {
+		var c cell.Cell
+		if err := rows.Scan(&c.AddedID, &c.RowKey, &c.ColumnName, &c.RefKey, &c.Body, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("partition read scan: %w", err)
 		}
 		cells = append(cells, c)
 	}

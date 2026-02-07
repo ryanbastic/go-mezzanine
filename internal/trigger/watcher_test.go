@@ -60,6 +60,10 @@ func (m *mockCellStore) GetRow(ctx context.Context, rowKey uuid.UUID) ([]cell.Ce
 	return nil, nil
 }
 
+func (m *mockCellStore) PartitionRead(ctx context.Context, partitionNumber int, readType int, addedID int64, createdAfter time.Time, limit int) ([]cell.Cell, error) {
+	return nil, nil
+}
+
 func (m *mockCellStore) ScanCells(ctx context.Context, columnName string, afterAddedID int64, limit int) ([]cell.Cell, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
