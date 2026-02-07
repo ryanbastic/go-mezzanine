@@ -25,7 +25,7 @@ func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.R
 	config.Info.Description = "Sharded cell-based data store"
 	api := humachi.New(mux, config)
 
-	cellHandler := NewCellHandler(router, numShards, notifier, logger)
+	cellHandler := NewCellHandler(router, numShards, indexRegistry, notifier, logger)
 	indexHandler := NewIndexHandler(indexRegistry, numShards, logger)
 	pluginHandler := NewPluginHandler(pluginRegistry, logger)
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/ryanbastic/go-mezzanine/internal/cell"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 )
 
@@ -125,6 +126,90 @@ func (r *Registry) StoreFor(indexName string, shardID shard.ID) (*Store, bool) {
 func (r *Registry) GetDefinition(indexName string) (Definition, bool) {
 	def, ok := r.definitions[indexName]
 	return def, ok
+}
+
+// ForColumn returns all definitions whose SourceColumn matches columnName.
+func (r *Registry) ForColumn(columnName string) []Definition {
+	var defs []Definition
+	for _, def := range r.definitions {
+		if def.SourceColumn == columnName {
+			defs = append(defs, def)
+		}
+	}
+	return defs
+}
+
+// IndexCell finds matching index definitions for the cell's column and writes
+// denormalized entries into the appropriate index shards.
+func (r *Registry) IndexCell(ctx context.Context, c *cell.Cell, numShards int) error {
+	defs := r.ForColumn(c.ColumnName)
+	for _, def := range defs {
+		shardKeyUUID, err := extractUUID(c.Body, def.ShardKeyField)
+		if err != nil {
+			return fmt.Errorf("index %s: extract shard key: %w", def.Name, err)
+		}
+
+		body, err := extractFields(c.Body, def.Fields)
+		if err != nil {
+			return fmt.Errorf("index %s: extract fields: %w", def.Name, err)
+		}
+
+		shardID := shard.ForRowKey(shardKeyUUID, numShards)
+		store, ok := r.StoreFor(def.Name, shardID)
+		if !ok {
+			return fmt.Errorf("index %s: no store for shard %d", def.Name, shardID)
+		}
+
+		if err := store.WriteEntry(ctx, Entry{
+			ShardKey: shardKeyUUID,
+			RowKey:   c.RowKey,
+			Body:     body,
+		}); err != nil {
+			return fmt.Errorf("index %s: %w", def.Name, err)
+		}
+	}
+	return nil
+}
+
+// extractUUID reads a string field from a JSON object and parses it as a UUID.
+func extractUUID(body json.RawMessage, field string) (uuid.UUID, error) {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return uuid.Nil, fmt.Errorf("unmarshal body: %w", err)
+	}
+
+	raw, ok := obj[field]
+	if !ok {
+		return uuid.Nil, fmt.Errorf("field %q not found", field)
+	}
+
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return uuid.Nil, fmt.Errorf("field %q is not a string: %w", field, err)
+	}
+
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("field %q is not a valid UUID: %w", field, err)
+	}
+	return id, nil
+}
+
+// extractFields copies only the specified keys from a JSON object.
+func extractFields(body json.RawMessage, fields []string) (json.RawMessage, error) {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return nil, fmt.Errorf("unmarshal body: %w", err)
+	}
+
+	subset := make(map[string]json.RawMessage, len(fields))
+	for _, f := range fields {
+		if v, ok := obj[f]; ok {
+			subset[f] = v
+		}
+	}
+
+	return json.Marshal(subset)
 }
 
 // CreateTables creates the index tables for all registered indexes.

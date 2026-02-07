@@ -11,6 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 	"github.com/ryanbastic/go-mezzanine/internal/cell"
+	"github.com/ryanbastic/go-mezzanine/internal/index"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 	"github.com/ryanbastic/go-mezzanine/internal/storage"
 	"github.com/ryanbastic/go-mezzanine/internal/trigger"
@@ -89,14 +90,15 @@ type PartitionReadOutput struct {
 // --- Handler ---
 
 type CellHandler struct {
-	router    *shard.Router
-	numShards int
-	notifier  *trigger.Notifier
-	logger    *slog.Logger
+	router        *shard.Router
+	numShards     int
+	indexRegistry *index.Registry
+	notifier      *trigger.Notifier
+	logger        *slog.Logger
 }
 
-func NewCellHandler(router *shard.Router, numShards int, notifier *trigger.Notifier, logger *slog.Logger) *CellHandler {
-	return &CellHandler{router: router, numShards: numShards, notifier: notifier, logger: logger}
+func NewCellHandler(router *shard.Router, numShards int, indexRegistry *index.Registry, notifier *trigger.Notifier, logger *slog.Logger) *CellHandler {
+	return &CellHandler{router: router, numShards: numShards, indexRegistry: indexRegistry, notifier: notifier, logger: logger}
 }
 
 func registerCellRoutes(api huma.API, h *CellHandler) {
@@ -165,6 +167,10 @@ func (h *CellHandler) WriteCell(ctx context.Context, input *WriteCellInput) (*Wr
 
 	if h.notifier != nil {
 		h.notifier.NotifyCell(int(shardID), c)
+	}
+
+	if err := h.indexRegistry.IndexCell(ctx, c, h.numShards); err != nil {
+		h.logger.Error("index write failed", "row_key", c.RowKey, "column_name", c.ColumnName, "error", err)
 	}
 
 	return &WriteCellOutput{Body: cellToResponse(c)}, nil

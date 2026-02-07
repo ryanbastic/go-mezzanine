@@ -497,7 +497,7 @@ func TestGetCell_ShardRoutingError(t *testing.T) {
 
 func TestNewCellHandler(t *testing.T) {
 	router := shard.NewRouter()
-	h := NewCellHandler(router, 64, nil, testLogger())
+	h := NewCellHandler(router, 64, index.NewRegistry(), nil, testLogger())
 	if h == nil {
 		t.Fatal("NewCellHandler returned nil")
 	}

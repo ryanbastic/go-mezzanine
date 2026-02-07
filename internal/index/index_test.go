@@ -1,8 +1,11 @@
 package index
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/ryanbastic/go-mezzanine/internal/cell"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 )
 
@@ -158,5 +161,165 @@ func TestDefinition_Fields(t *testing.T) {
 	}
 	if len(def.Fields) != 2 || def.Fields[0] != "a" || def.Fields[1] != "b" {
 		t.Error("Fields mismatch")
+	}
+}
+
+// --- extractUUID Tests ---
+
+func TestExtractUUID_Valid(t *testing.T) {
+	id := uuid.New()
+	body := []byte(`{"user_id":"` + id.String() + `"}`)
+
+	got, err := extractUUID(json.RawMessage(body), "user_id")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != id {
+		t.Errorf("got %s, want %s", got, id)
+	}
+}
+
+func TestExtractUUID_MissingField(t *testing.T) {
+	body := []byte(`{"other":"value"}`)
+	_, err := extractUUID(json.RawMessage(body), "user_id")
+	if err == nil {
+		t.Fatal("expected error for missing field")
+	}
+}
+
+func TestExtractUUID_NonStringField(t *testing.T) {
+	body := []byte(`{"user_id":12345}`)
+	_, err := extractUUID(json.RawMessage(body), "user_id")
+	if err == nil {
+		t.Fatal("expected error for non-string field")
+	}
+}
+
+func TestExtractUUID_InvalidUUID(t *testing.T) {
+	body := []byte(`{"user_id":"not-a-uuid"}`)
+	_, err := extractUUID(json.RawMessage(body), "user_id")
+	if err == nil {
+		t.Fatal("expected error for invalid UUID")
+	}
+}
+
+// --- extractFields Tests ---
+
+func TestExtractFields_Subset(t *testing.T) {
+	body := []byte(`{"email":"a@b.com","name":"Alice","age":30}`)
+	got, err := extractFields(json.RawMessage(body), []string{"email", "name"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(got, &m); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if len(m) != 2 {
+		t.Errorf("got %d keys, want 2", len(m))
+	}
+	if _, ok := m["email"]; !ok {
+		t.Error("missing email")
+	}
+	if _, ok := m["name"]; !ok {
+		t.Error("missing name")
+	}
+	if _, ok := m["age"]; ok {
+		t.Error("age should not be included")
+	}
+}
+
+func TestExtractFields_MissingFieldsSkipped(t *testing.T) {
+	body := []byte(`{"email":"a@b.com"}`)
+	got, err := extractFields(json.RawMessage(body), []string{"email", "nonexistent"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(got, &m); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if len(m) != 1 {
+		t.Errorf("got %d keys, want 1", len(m))
+	}
+}
+
+func TestExtractFields_EmptyList(t *testing.T) {
+	body := []byte(`{"email":"a@b.com"}`)
+	got, err := extractFields(json.RawMessage(body), []string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(got, &m); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if len(m) != 0 {
+		t.Errorf("got %d keys, want 0", len(m))
+	}
+}
+
+// --- ForColumn Tests ---
+
+func TestRegistry_ForColumn_Matches(t *testing.T) {
+	r := NewRegistry()
+	r.Register(nil, Definition{Name: "idx_a", SourceColumn: "profile"}, 2)
+	r.Register(nil, Definition{Name: "idx_b", SourceColumn: "profile"}, 2)
+	r.Register(nil, Definition{Name: "idx_c", SourceColumn: "settings"}, 2)
+
+	defs := r.ForColumn("profile")
+	if len(defs) != 2 {
+		t.Errorf("got %d definitions, want 2", len(defs))
+	}
+}
+
+func TestRegistry_ForColumn_NoMatches(t *testing.T) {
+	r := NewRegistry()
+	r.Register(nil, Definition{Name: "idx_a", SourceColumn: "profile"}, 2)
+
+	defs := r.ForColumn("nonexistent")
+	if len(defs) != 0 {
+		t.Errorf("got %d definitions, want 0", len(defs))
+	}
+}
+
+// --- IndexCell Tests ---
+
+func TestRegistry_IndexCell_NoMatchingDefs(t *testing.T) {
+	r := NewRegistry()
+
+	c := &cell.Cell{
+		RowKey:     uuid.New(),
+		ColumnName: "unmatched",
+		Body:       json.RawMessage(`{}`),
+	}
+
+	// No definitions registered, so nothing to index — should succeed.
+	if err := r.IndexCell(t.Context(), c, 4); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRegistry_IndexCell_ExtractUUIDError(t *testing.T) {
+	r := NewRegistry()
+	r.Register(nil, Definition{
+		Name:          "idx",
+		SourceColumn:  "profile",
+		ShardKeyField: "user_id",
+		Fields:        []string{"email"},
+	}, 4)
+
+	c := &cell.Cell{
+		RowKey:     uuid.New(),
+		ColumnName: "profile",
+		Body:       json.RawMessage(`{"email":"a@b.com"}`), // missing user_id
+	}
+
+	err := r.IndexCell(t.Context(), c, 4)
+	if err == nil {
+		t.Fatal("expected error for missing shard key field")
 	}
 }
