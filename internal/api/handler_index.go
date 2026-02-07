@@ -1,50 +1,111 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 	"github.com/ryanbastic/go-mezzanine/internal/index"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 )
 
-// IndexHandler handles HTTP requests for secondary index queries.
+// --- Huma Input/Output types ---
+
+type QueryIndexInput struct {
+	IndexName string `path:"index_name" doc:"Secondary index name"`
+	ShardKey  string `path:"shard_key" doc:"Shard key UUID" format:"uuid"`
+}
+
+type IndexEntryResponse struct {
+	AddedID   int64           `json:"added_id" doc:"Auto-incremented ID"`
+	ShardKey  uuid.UUID       `json:"shard_key" doc:"Shard key UUID"`
+	RowKey    uuid.UUID       `json:"row_key" doc:"Row key UUID"`
+	Body      json.RawMessage `json:"body" doc:"Denormalized JSON payload"`
+	CreatedAt time.Time       `json:"created_at" doc:"Creation timestamp"`
+}
+
+type QueryIndexOutput struct {
+	Body []IndexEntryResponse
+}
+
+// --- Handler ---
+
 type IndexHandler struct {
 	registry  *index.Registry
 	numShards int
 	logger    *slog.Logger
 }
 
-// NewIndexHandler creates a new IndexHandler.
 func NewIndexHandler(registry *index.Registry, numShards int, logger *slog.Logger) *IndexHandler {
 	return &IndexHandler{registry: registry, numShards: numShards, logger: logger}
 }
 
-// QueryIndex handles GET /v1/index/{index_name}/{shard_key}
-func (h *IndexHandler) QueryIndex(w http.ResponseWriter, r *http.Request) {
-	indexName := chi.URLParam(r, "index_name")
-	shardKey, err := uuid.Parse(chi.URLParam(r, "shard_key"))
+func registerIndexRoutes(api huma.API, h *IndexHandler) {
+	huma.Register(api, huma.Operation{
+		OperationID: "query-index",
+		Method:      http.MethodGet,
+		Path:        "/v1/index/{index_name}/{shard_key}",
+		Summary:     "Query secondary index",
+		Tags:        []string{"index"},
+	}, h.QueryIndex)
+}
+
+func (h *IndexHandler) QueryIndex(ctx context.Context, input *QueryIndexInput) (*QueryIndexOutput, error) {
+	shardKey, err := uuid.Parse(input.ShardKey)
 	if err != nil {
-		h.logger.Warn("invalid shard_key", "error", err)
-		writeError(w, http.StatusBadRequest, "invalid shard_key")
-		return
+		return nil, huma.Error400BadRequest("invalid shard_key")
 	}
 
 	shardID := shard.ForRowKey(shardKey, h.numShards)
-	store, ok := h.registry.StoreFor(indexName, shardID)
+	store, ok := h.registry.StoreFor(input.IndexName, shardID)
 	if !ok {
-		writeError(w, http.StatusNotFound, "index not found")
-		return
+		return nil, huma.Error404NotFound("index not found")
 	}
 
-	entries, err := store.QueryByShardKey(r.Context(), shardKey)
+	entries, err := store.QueryByShardKey(ctx, shardKey)
 	if err != nil {
-		h.logger.Error("failed to query index", "index_name", indexName, "shard_key", shardKey, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to query index")
-		return
+		h.logger.Error("failed to query index", "index_name", input.IndexName, "shard_key", shardKey, "error", err)
+		return nil, huma.Error500InternalServerError("failed to query index")
 	}
 
-	writeJSON(w, http.StatusOK, entries)
+	resp := make([]IndexEntryResponse, len(entries))
+	for i, e := range entries {
+		resp[i] = IndexEntryResponse{
+			AddedID:   e.AddedID,
+			ShardKey:  e.ShardKey,
+			RowKey:    e.RowKey,
+			Body:      e.Body,
+			CreatedAt: e.CreatedAt,
+		}
+	}
+
+	return &QueryIndexOutput{Body: resp}, nil
+}
+
+// --- Health ---
+
+type HealthInput struct{}
+
+type HealthResponse struct {
+	Status string `json:"status" doc:"Service health status" example:"ok"`
+}
+
+type HealthOutput struct {
+	Body HealthResponse
+}
+
+func registerHealthRoute(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "health-check",
+		Method:      http.MethodGet,
+		Path:        "/v1/health",
+		Summary:     "Health check",
+		Tags:        []string{"health"},
+	}, func(ctx context.Context, input *HealthInput) (*HealthOutput, error) {
+		return &HealthOutput{Body: HealthResponse{Status: "ok"}}, nil
+	})
 }

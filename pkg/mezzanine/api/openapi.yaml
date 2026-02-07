@@ -1,0 +1,417 @@
+openapi: 3.1.0
+info:
+  description: Sharded cell-based data store
+  title: Mezzanine API
+  version: 1.0.0
+servers:
+- url: /
+paths:
+  /v1/cells:
+    post:
+      operationId: write-cell
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WriteCellBody'
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CellResponse'
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+          description: Error
+      summary: Write a cell
+      tags:
+      - cells
+  /v1/cells/{row_key}:
+    get:
+      operationId: get-row
+      parameters:
+      - description: Row key UUID
+        explode: false
+        in: path
+        name: row_key
+        required: true
+        schema:
+          description: Row key UUID
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RowResponse'
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+          description: Error
+      summary: Get all latest cells for a row
+      tags:
+      - cells
+  /v1/cells/{row_key}/{column_name}:
+    get:
+      operationId: get-cell-latest
+      parameters:
+      - description: Row key UUID
+        explode: false
+        in: path
+        name: row_key
+        required: true
+        schema:
+          description: Row key UUID
+          format: uuid
+          type: string
+        style: simple
+      - description: Column name
+        explode: false
+        in: path
+        name: column_name
+        required: true
+        schema:
+          description: Column name
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CellResponse'
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+          description: Error
+      summary: Get latest cell version
+      tags:
+      - cells
+  /v1/cells/{row_key}/{column_name}/{ref_key}:
+    get:
+      operationId: get-cell
+      parameters:
+      - description: Row key UUID
+        explode: false
+        in: path
+        name: row_key
+        required: true
+        schema:
+          description: Row key UUID
+          format: uuid
+          type: string
+        style: simple
+      - description: Column name
+        explode: false
+        in: path
+        name: column_name
+        required: true
+        schema:
+          description: Column name
+          type: string
+        style: simple
+      - description: Reference key version
+        explode: false
+        in: path
+        name: ref_key
+        required: true
+        schema:
+          description: Reference key version
+          format: int64
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CellResponse'
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+          description: Error
+      summary: Get exact cell version
+      tags:
+      - cells
+  /v1/health:
+    get:
+      operationId: health-check
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+          description: Error
+      summary: Health check
+      tags:
+      - health
+  /v1/index/{index_name}/{shard_key}:
+    get:
+      operationId: query-index
+      parameters:
+      - description: Secondary index name
+        explode: false
+        in: path
+        name: index_name
+        required: true
+        schema:
+          description: Secondary index name
+          type: string
+        style: simple
+      - description: Shard key UUID
+        explode: false
+        in: path
+        name: shard_key
+        required: true
+        schema:
+          description: Shard key UUID
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/IndexEntryResponse'
+                nullable: true
+                type: array
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+          description: Error
+      summary: Query secondary index
+      tags:
+      - index
+components:
+  schemas:
+    CellResponse:
+      additionalProperties: false
+      example:
+        row_key: row_key
+        $schema: https://openapi-generator.tech
+        column_name: column_name
+        added_id: 0
+        created_at: 2000-01-23T04:56:07.000+00:00
+        ref_key: 6
+        body: ""
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        added_id:
+          description: Auto-incremented ID
+          format: int64
+          type: integer
+        body: {}
+        column_name:
+          description: Column name
+          type: string
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          type: string
+        ref_key:
+          description: Reference key version
+          format: int64
+          type: integer
+        row_key:
+          description: Row key UUID
+          type: string
+      required:
+      - added_id
+      - body
+      - column_name
+      - created_at
+      - ref_key
+      - row_key
+    ErrorDetail:
+      additionalProperties: false
+      properties:
+        location:
+          description: "Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'"
+          type: string
+        message:
+          description: Error message text
+          type: string
+        value: {}
+    ErrorModel:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        detail:
+          description: A human-readable explanation specific to this occurrence of
+            the problem.
+          type: string
+        errors:
+          description: Optional list of individual error details
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+          nullable: true
+          type: array
+        instance:
+          description: A URI reference that identifies the specific occurrence of
+            the problem.
+          format: uri
+          type: string
+        status:
+          description: HTTP status code
+          format: int64
+          type: integer
+        title:
+          description: "A short, human-readable summary of the problem type. This\
+            \ value should not change between occurrences of the error."
+          type: string
+        type:
+          default: about:blank
+          description: A URI reference to human-readable documentation for the error.
+          format: uri
+          type: string
+    HealthResponse:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        status: status
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        status:
+          description: Service health status
+          type: string
+      required:
+      - status
+    IndexEntryResponse:
+      additionalProperties: false
+      example:
+        row_key: row_key
+        shard_key: shard_key
+        added_id: 0
+        created_at: 2000-01-23T04:56:07.000+00:00
+        body: ""
+      properties:
+        added_id:
+          description: Auto-incremented ID
+          format: int64
+          type: integer
+        body: {}
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          type: string
+        row_key:
+          description: Row key UUID
+          type: string
+        shard_key:
+          description: Shard key UUID
+          type: string
+      required:
+      - added_id
+      - body
+      - created_at
+      - row_key
+      - shard_key
+    RowResponse:
+      additionalProperties: false
+      example:
+        row_key: row_key
+        cells:
+        - row_key: row_key
+          $schema: https://openapi-generator.tech
+          column_name: column_name
+          added_id: 0
+          created_at: 2000-01-23T04:56:07.000+00:00
+          ref_key: 6
+          body: ""
+        - row_key: row_key
+          $schema: https://openapi-generator.tech
+          column_name: column_name
+          added_id: 0
+          created_at: 2000-01-23T04:56:07.000+00:00
+          ref_key: 6
+          body: ""
+        $schema: https://openapi-generator.tech
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        cells:
+          description: Latest cell per column
+          items:
+            $ref: '#/components/schemas/CellResponse'
+          nullable: true
+          type: array
+        row_key:
+          description: Row key UUID
+          type: string
+      required:
+      - cells
+      - row_key
+    WriteCellBody:
+      additionalProperties: false
+      example:
+        row_key: row_key
+        $schema: https://openapi-generator.tech
+        column_name: column_name
+        ref_key: 0
+        body: ""
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        body: {}
+        column_name:
+          description: Column name
+          minLength: 1
+          type: string
+        ref_key:
+          description: Reference key version
+          format: int64
+          type: integer
+        row_key:
+          description: Row key UUID
+          type: string
+      required:
+      - body
+      - column_name
+      - ref_key
+      - row_key

@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/ryanbastic/go-mezzanine/internal/index"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
@@ -17,24 +19,16 @@ func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.R
 	mux.Use(Logging(logger))
 	mux.Use(Recovery(logger))
 
+	config := huma.DefaultConfig("Mezzanine API", "1.0.0")
+	config.Info.Description = "Sharded cell-based data store"
+	api := humachi.New(mux, config)
+
 	cellHandler := NewCellHandler(router, numShards, logger)
 	indexHandler := NewIndexHandler(indexRegistry, numShards, logger)
 
-	mux.Route("/v1", func(r chi.Router) {
-		// Cell operations
-		r.Post("/cells", cellHandler.WriteCell)
-		r.Get("/cells/{row_key}/{column_name}/{ref_key}", cellHandler.GetCell)
-		r.Get("/cells/{row_key}/{column_name}", cellHandler.GetCellLatest)
-		r.Get("/cells/{row_key}", cellHandler.GetRow)
-
-		// Secondary index queries
-		r.Get("/index/{index_name}/{shard_key}", indexHandler.QueryIndex)
-
-		// Health
-		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-		})
-	})
+	registerCellRoutes(api, cellHandler)
+	registerIndexRoutes(api, indexHandler)
+	registerHealthRoute(api)
 
 	return mux
 }

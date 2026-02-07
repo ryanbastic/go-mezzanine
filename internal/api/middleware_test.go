@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -118,6 +119,14 @@ func TestRecovery_CatchesPanic(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("status: got %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["error"] != "internal server error" {
+		t.Errorf("error: got %q", resp["error"])
 	}
 }
 

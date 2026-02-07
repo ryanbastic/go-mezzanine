@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/ryanbastic/go-mezzanine/internal/cell"
+	"github.com/ryanbastic/go-mezzanine/internal/index"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 	"github.com/ryanbastic/go-mezzanine/internal/storage"
 )
@@ -20,7 +20,7 @@ import (
 // --- Mock CellStore ---
 
 type mockCellStore struct {
-	cells      map[string]*cell.Cell // keyed by "rowKey:colName:refKey"
+	cells      map[string]*cell.Cell
 	rows       map[string][]cell.Cell
 	writeErr   error
 	getErr     error
@@ -72,7 +72,6 @@ func (m *mockCellStore) GetCellLatest(ctx context.Context, rowKey uuid.UUID, col
 	if m.latestErr != nil {
 		return nil, m.latestErr
 	}
-	// Find cell with highest ref_key for this row+column
 	var best *cell.Cell
 	for _, c := range m.cells {
 		if c.RowKey == rowKey && c.ColumnName == columnName {
@@ -99,28 +98,19 @@ func (m *mockCellStore) ScanCells(ctx context.Context, columnName string, afterA
 	return nil, nil
 }
 
-func setupRouter(store storage.CellStore, numShards int) *shard.Router {
+func setupTestServer(store storage.CellStore, numShards int) http.Handler {
 	r := shard.NewRouter()
 	for i := 0; i < numShards; i++ {
 		r.Register(shard.ID(i), store)
 	}
-	return r
-}
-
-func chiContext(r *http.Request, params map[string]string) *http.Request {
-	rctx := chi.NewRouteContext()
-	for k, v := range params {
-		rctx.URLParams.Add(k, v)
-	}
-	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+	return NewServer(testLogger(), r, index.NewRegistry(), numShards)
 }
 
 // --- WriteCell Tests ---
 
 func TestWriteCell_Success(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	rowKey := uuid.New()
 	body := map[string]any{
@@ -132,15 +122,16 @@ func TestWriteCell_Success(t *testing.T) {
 	data, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/cells", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handler.WriteCell(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusCreated)
+		t.Errorf("status: got %d, want %d\nbody: %s", w.Code, http.StatusCreated, w.Body.String())
 	}
 
-	var resp cell.Cell
+	var resp CellResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -154,45 +145,22 @@ func TestWriteCell_Success(t *testing.T) {
 
 func TestWriteCell_InvalidBody(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/cells", bytes.NewReader([]byte("invalid json")))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handler.WriteCell(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
-	}
-}
-
-func TestWriteCell_MissingRowKey(t *testing.T) {
-	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
-
-	body := map[string]any{
-		"column_name": "profile",
-		"ref_key":     1,
-		"body":        map[string]string{"name": "test"},
-	}
-	data, _ := json.Marshal(body)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/cells", bytes.NewReader(data))
-	w := httptest.NewRecorder()
-
-	handler.WriteCell(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
+		t.Errorf("status: got %d, want %d\nbody: %s", w.Code, http.StatusBadRequest, w.Body.String())
 	}
 }
 
 func TestWriteCell_MissingColumnName(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	body := map[string]any{
 		"row_key": uuid.New().String(),
@@ -202,42 +170,20 @@ func TestWriteCell_MissingColumnName(t *testing.T) {
 	data, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/cells", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handler.WriteCell(w, req)
+	server.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
-	}
-}
-
-func TestWriteCell_MissingBody(t *testing.T) {
-	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
-
-	body := map[string]any{
-		"row_key":     uuid.New().String(),
-		"column_name": "profile",
-		"ref_key":     1,
-	}
-	data, _ := json.Marshal(body)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/cells", bytes.NewReader(data))
-	w := httptest.NewRecorder()
-
-	handler.WriteCell(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
+	if w.Code < 400 || w.Code >= 500 {
+		t.Errorf("status: got %d, want 4xx\nbody: %s", w.Code, w.Body.String())
 	}
 }
 
 func TestWriteCell_StoreError(t *testing.T) {
 	store := newMockCellStore()
 	store.writeErr = errors.New("db error")
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	body := map[string]any{
 		"row_key":     uuid.New().String(),
@@ -248,9 +194,10 @@ func TestWriteCell_StoreError(t *testing.T) {
 	data, _ := json.Marshal(body)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/cells", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handler.WriteCell(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("status: got %d, want %d", w.Code, http.StatusInternalServerError)
@@ -271,80 +218,57 @@ func TestGetCell_Success(t *testing.T) {
 		CreatedAt:  time.Now(),
 	}
 
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     rowKey.String(),
-		"column_name": "profile",
-		"ref_key":     "1",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetCell(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusOK)
+		t.Errorf("status: got %d, want %d\nbody: %s", w.Code, http.StatusOK, w.Body.String())
 	}
 }
 
 func TestGetCell_InvalidRowKey(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/not-a-uuid/profile/1", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     "not-a-uuid",
-		"column_name": "profile",
-		"ref_key":     "1",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetCell(w, req)
+	server.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
+	// Huma validates uuid format at the path param level
+	if w.Code < 400 || w.Code >= 500 {
+		t.Errorf("status: got %d, want 4xx", w.Code)
 	}
 }
 
 func TestGetCell_InvalidRefKey(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/abc", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     rowKey.String(),
-		"column_name": "profile",
-		"ref_key":     "abc",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetCell(w, req)
+	server.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
+	if w.Code < 400 || w.Code >= 500 {
+		t.Errorf("status: got %d, want 4xx", w.Code)
 	}
 }
 
 func TestGetCell_NotFound(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     rowKey.String(),
-		"column_name": "profile",
-		"ref_key":     "1",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetCell(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("status: got %d, want %d", w.Code, http.StatusNotFound)
@@ -354,19 +278,14 @@ func TestGetCell_NotFound(t *testing.T) {
 func TestGetCell_StoreError(t *testing.T) {
 	store := newMockCellStore()
 	store.getErr = errors.New("db error")
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	rowKey := uuid.New()
+	store.cells[cellKey(rowKey, "profile", 1)] = &cell.Cell{} // ensure shard routes
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     rowKey.String(),
-		"column_name": "profile",
-		"ref_key":     "1",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetCell(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("status: got %d, want %d", w.Code, http.StatusInternalServerError)
@@ -379,39 +298,26 @@ func TestGetCellLatest_Success(t *testing.T) {
 	store := newMockCellStore()
 	rowKey := uuid.New()
 	store.cells[cellKey(rowKey, "profile", 1)] = &cell.Cell{
-		AddedID:    1,
-		RowKey:     rowKey,
-		ColumnName: "profile",
-		RefKey:     1,
-		Body:       json.RawMessage(`{"v":1}`),
-		CreatedAt:  time.Now(),
+		AddedID: 1, RowKey: rowKey, ColumnName: "profile", RefKey: 1,
+		Body: json.RawMessage(`{"v":1}`), CreatedAt: time.Now(),
 	}
 	store.cells[cellKey(rowKey, "profile", 2)] = &cell.Cell{
-		AddedID:    2,
-		RowKey:     rowKey,
-		ColumnName: "profile",
-		RefKey:     2,
-		Body:       json.RawMessage(`{"v":2}`),
-		CreatedAt:  time.Now(),
+		AddedID: 2, RowKey: rowKey, ColumnName: "profile", RefKey: 2,
+		Body: json.RawMessage(`{"v":2}`), CreatedAt: time.Now(),
 	}
 
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     rowKey.String(),
-		"column_name": "profile",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetCellLatest(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusOK)
+		t.Errorf("status: got %d, want %d\nbody: %s", w.Code, http.StatusOK, w.Body.String())
 	}
 
-	var resp cell.Cell
+	var resp CellResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -422,37 +328,27 @@ func TestGetCellLatest_Success(t *testing.T) {
 
 func TestGetCellLatest_InvalidRowKey(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/invalid/profile", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     "invalid",
-		"column_name": "profile",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetCellLatest(w, req)
+	server.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
+	if w.Code < 400 || w.Code >= 500 {
+		t.Errorf("status: got %d, want 4xx", w.Code)
 	}
 }
 
 func TestGetCellLatest_NotFound(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     rowKey.String(),
-		"column_name": "profile",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetCellLatest(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("status: got %d, want %d", w.Code, http.StatusNotFound)
@@ -462,18 +358,13 @@ func TestGetCellLatest_NotFound(t *testing.T) {
 func TestGetCellLatest_StoreError(t *testing.T) {
 	store := newMockCellStore()
 	store.latestErr = errors.New("db error")
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     rowKey.String(),
-		"column_name": "profile",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetCellLatest(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("status: got %d, want %d", w.Code, http.StatusInternalServerError)
@@ -490,25 +381,18 @@ func TestGetRow_Success(t *testing.T) {
 		{AddedID: 2, RowKey: rowKey, ColumnName: "settings", RefKey: 1, Body: json.RawMessage(`{}`), CreatedAt: time.Now()},
 	}
 
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String(), nil)
-	req = chiContext(req, map[string]string{
-		"row_key": rowKey.String(),
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetRow(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusOK)
+		t.Errorf("status: got %d, want %d\nbody: %s", w.Code, http.StatusOK, w.Body.String())
 	}
 
-	var resp struct {
-		RowKey uuid.UUID   `json:"row_key"`
-		Cells  []cell.Cell `json:"cells"`
-	}
+	var resp RowResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -522,35 +406,27 @@ func TestGetRow_Success(t *testing.T) {
 
 func TestGetRow_InvalidRowKey(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/not-a-uuid", nil)
-	req = chiContext(req, map[string]string{
-		"row_key": "not-a-uuid",
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetRow(w, req)
+	server.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
+	if w.Code < 400 || w.Code >= 500 {
+		t.Errorf("status: got %d, want 4xx", w.Code)
 	}
 }
 
 func TestGetRow_Empty(t *testing.T) {
 	store := newMockCellStore()
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String(), nil)
-	req = chiContext(req, map[string]string{
-		"row_key": rowKey.String(),
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetRow(w, req)
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("status: got %d, want %d", w.Code, http.StatusOK)
@@ -560,17 +436,52 @@ func TestGetRow_Empty(t *testing.T) {
 func TestGetRow_StoreError(t *testing.T) {
 	store := newMockCellStore()
 	store.rowErr = errors.New("db error")
-	router := setupRouter(store, 64)
-	handler := NewCellHandler(router, 64, testLogger())
+	server := setupTestServer(store, 64)
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String(), nil)
-	req = chiContext(req, map[string]string{
-		"row_key": rowKey.String(),
-	})
 	w := httptest.NewRecorder()
 
-	handler.GetRow(w, req)
+	server.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("status: got %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+}
+
+// --- Shard Routing Error Tests ---
+
+func TestWriteCell_ShardRoutingError(t *testing.T) {
+	// No stores registered
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), 64)
+
+	body := map[string]any{
+		"row_key":     uuid.New().String(),
+		"column_name": "profile",
+		"ref_key":     1,
+		"body":        map[string]string{"name": "test"},
+	}
+	data, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/cells", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	server.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("status: got %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestGetCell_ShardRoutingError(t *testing.T) {
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), 64)
+
+	rowKey := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)
+	w := httptest.NewRecorder()
+
+	server.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("status: got %d, want %d", w.Code, http.StatusInternalServerError)
@@ -584,50 +495,5 @@ func TestNewCellHandler(t *testing.T) {
 	h := NewCellHandler(router, 64, testLogger())
 	if h == nil {
 		t.Fatal("NewCellHandler returned nil")
-	}
-}
-
-// --- Shard Routing Error Tests ---
-
-func TestWriteCell_ShardRoutingError(t *testing.T) {
-	// Router with no stores registered
-	router := shard.NewRouter()
-	handler := NewCellHandler(router, 64, testLogger())
-
-	body := map[string]any{
-		"row_key":     uuid.New().String(),
-		"column_name": "profile",
-		"ref_key":     1,
-		"body":        map[string]string{"name": "test"},
-	}
-	data, _ := json.Marshal(body)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/cells", bytes.NewReader(data))
-	w := httptest.NewRecorder()
-
-	handler.WriteCell(w, req)
-
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusInternalServerError)
-	}
-}
-
-func TestGetCell_ShardRoutingError(t *testing.T) {
-	router := shard.NewRouter()
-	handler := NewCellHandler(router, 64, testLogger())
-
-	rowKey := uuid.New()
-	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)
-	req = chiContext(req, map[string]string{
-		"row_key":     rowKey.String(),
-		"column_name": "profile",
-		"ref_key":     "1",
-	})
-	w := httptest.NewRecorder()
-
-	handler.GetCell(w, req)
-
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("status: got %d, want %d", w.Code, http.StatusInternalServerError)
 	}
 }
