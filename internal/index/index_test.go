@@ -303,6 +303,103 @@ func TestRegistry_IndexCell_NoMatchingDefs(t *testing.T) {
 	}
 }
 
+// --- RegisterRange Tests ---
+
+func TestRegistry_RegisterRange_SingleRange(t *testing.T) {
+	r := NewRegistry()
+	def := Definition{
+		Name:          "user_by_email",
+		SourceColumn:  "profile",
+		ShardKeyField: "org_id",
+		Fields:        []string{"email"},
+	}
+
+	r.RegisterRange(nil, def, 0, 3)
+
+	for i := 0; i <= 3; i++ {
+		store, ok := r.StoreFor("user_by_email", shard.ID(i))
+		if !ok {
+			t.Errorf("StoreFor shard %d: not found", i)
+		}
+		if store == nil {
+			t.Errorf("StoreFor shard %d: nil store", i)
+		}
+	}
+
+	// Shard 4 should not exist
+	if _, ok := r.StoreFor("user_by_email", shard.ID(4)); ok {
+		t.Error("shard 4 should not exist")
+	}
+}
+
+func TestRegistry_RegisterRange_MultipleRanges(t *testing.T) {
+	r := NewRegistry()
+	def := Definition{
+		Name:          "user_by_email",
+		SourceColumn:  "profile",
+		ShardKeyField: "org_id",
+		Fields:        []string{"email"},
+	}
+
+	// Simulate two backends
+	r.RegisterRange(nil, def, 0, 1)
+	r.RegisterRange(nil, def, 2, 3)
+
+	for i := 0; i <= 3; i++ {
+		store, ok := r.StoreFor("user_by_email", shard.ID(i))
+		if !ok {
+			t.Errorf("StoreFor shard %d: not found", i)
+		}
+		if store == nil {
+			t.Errorf("StoreFor shard %d: nil store", i)
+		}
+	}
+}
+
+func TestRegistry_RegisterRange_SingleShard(t *testing.T) {
+	r := NewRegistry()
+	def := Definition{Name: "test_idx"}
+	r.RegisterRange(nil, def, 5, 5)
+
+	if _, ok := r.StoreFor("test_idx", shard.ID(5)); !ok {
+		t.Error("shard 5 not found")
+	}
+	if _, ok := r.StoreFor("test_idx", shard.ID(4)); ok {
+		t.Error("shard 4 should not exist")
+	}
+	if _, ok := r.StoreFor("test_idx", shard.ID(6)); ok {
+		t.Error("shard 6 should not exist")
+	}
+}
+
+func TestRegistry_RegisterRange_DefinitionPreserved(t *testing.T) {
+	r := NewRegistry()
+	def := Definition{
+		Name:          "user_by_email",
+		SourceColumn:  "profile",
+		ShardKeyField: "org_id",
+		Fields:        []string{"email", "name"},
+	}
+	r.RegisterRange(nil, def, 0, 1)
+
+	got, ok := r.GetDefinition("user_by_email")
+	if !ok {
+		t.Fatal("definition not found")
+	}
+	if got.Name != "user_by_email" {
+		t.Errorf("Name: got %q", got.Name)
+	}
+	if got.SourceColumn != "profile" {
+		t.Errorf("SourceColumn: got %q", got.SourceColumn)
+	}
+	if got.ShardKeyField != "org_id" {
+		t.Errorf("ShardKeyField: got %q", got.ShardKeyField)
+	}
+	if len(got.Fields) != 2 {
+		t.Errorf("Fields: got %d", len(got.Fields))
+	}
+}
+
 func TestRegistry_IndexCell_ExtractUUIDError(t *testing.T) {
 	r := NewRegistry()
 	r.Register(nil, Definition{

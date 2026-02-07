@@ -29,15 +29,20 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.LogLevel != "info" {
 		t.Errorf("LogLevel: got %q, want %q", cfg.LogLevel, "info")
 	}
+	if cfg.IndexConfigPath != "" {
+		t.Errorf("IndexConfigPath: got %q, want empty", cfg.IndexConfigPath)
+	}
 }
 
 func TestLoad_CustomValues(t *testing.T) {
 	os.Setenv("SHARD_CONFIG_PATH", "/custom/path.json")
+	os.Setenv("INDEX_CONFIG_PATH", "/custom/indexes.json")
 	os.Setenv("PORT", "9090")
 	os.Setenv("NUM_SHARDS", "128")
 	os.Setenv("LOG_LEVEL", "debug")
 	defer func() {
 		os.Unsetenv("SHARD_CONFIG_PATH")
+		os.Unsetenv("INDEX_CONFIG_PATH")
 		os.Unsetenv("PORT")
 		os.Unsetenv("NUM_SHARDS")
 		os.Unsetenv("LOG_LEVEL")
@@ -47,6 +52,9 @@ func TestLoad_CustomValues(t *testing.T) {
 
 	if cfg.ShardConfigPath != "/custom/path.json" {
 		t.Errorf("ShardConfigPath: got %q", cfg.ShardConfigPath)
+	}
+	if cfg.IndexConfigPath != "/custom/indexes.json" {
+		t.Errorf("IndexConfigPath: got %q", cfg.IndexConfigPath)
 	}
 	if cfg.Port != "9090" {
 		t.Errorf("Port: got %q", cfg.Port)

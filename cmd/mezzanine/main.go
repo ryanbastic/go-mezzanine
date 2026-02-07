@@ -95,6 +95,39 @@ func main() {
 	// Initialize index registry
 	indexRegistry := index.NewRegistry()
 
+	if cfg.IndexConfigPath != "" {
+		idxCfg, err := config.LoadIndexConfig(cfg.IndexConfigPath)
+		if err != nil {
+			logger.Error("failed to load index config", "error", err)
+			os.Exit(1)
+		}
+
+		// Register all definitions across all backends
+		for _, b := range shardCfg.Backends {
+			pool := pools[b.Name]
+			for _, idx := range idxCfg.Indexes {
+				indexRegistry.RegisterRange(pool, index.Definition{
+					Name:          idx.Name,
+					SourceColumn:  idx.SourceColumn,
+					ShardKeyField: idx.ShardKeyField,
+					Fields:        idx.Fields,
+				}, b.ShardStart, b.ShardEnd)
+			}
+		}
+
+		// Create index tables per backend
+		for _, b := range shardCfg.Backends {
+			pool := pools[b.Name]
+			if err := indexRegistry.CreateTablesRange(ctx, pool, b.ShardStart, b.ShardEnd); err != nil {
+				logger.Error("failed to create index tables", "backend", b.Name, "error", err)
+				os.Exit(1)
+			}
+			logger.Info("index tables created", "backend", b.Name, "shards", []int{b.ShardStart, b.ShardEnd})
+		}
+
+		logger.Info("indexes registered", "count", len(idxCfg.Indexes))
+	}
+
 	// Initialize trigger plugin system
 	pluginRegistry := trigger.NewPluginRegistry()
 	rpcClient := trigger.NewRPCClient(cfg.TriggerRetryMax, cfg.TriggerRetryBackoff, cfg.TriggerRPCTimeout)

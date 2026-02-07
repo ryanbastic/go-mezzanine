@@ -212,6 +212,46 @@ func extractFields(body json.RawMessage, fields []string) (json.RawMessage, erro
 	return json.Marshal(subset)
 }
 
+// RegisterRange adds an index definition and creates stores for shards [shardStart, shardEnd].
+// It accumulates stores so calling for backend-a then backend-b builds the full map.
+func (r *Registry) RegisterRange(pool *pgxpool.Pool, def Definition, shardStart, shardEnd int) {
+	r.definitions[def.Name] = def
+	shardStores, ok := r.stores[def.Name]
+	if !ok {
+		shardStores = make(map[shard.ID]*Store)
+		r.stores[def.Name] = shardStores
+	}
+	for i := shardStart; i <= shardEnd; i++ {
+		shardStores[shard.ID(i)] = NewStore(pool, def.Name, i)
+	}
+}
+
+// CreateTablesRange creates index tables for shards [shardStart, shardEnd] using the given pool.
+func (r *Registry) CreateTablesRange(ctx context.Context, pool *pgxpool.Pool, shardStart, shardEnd int) error {
+	for indexName := range r.definitions {
+		for i := shardStart; i <= shardEnd; i++ {
+			table := IndexTable(indexName, i)
+			ddl := fmt.Sprintf(`
+				CREATE TABLE IF NOT EXISTS %s (
+					added_id   BIGSERIAL PRIMARY KEY,
+					shard_key  UUID NOT NULL,
+					row_key    UUID NOT NULL,
+					body       JSONB NOT NULL,
+					created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+				);
+
+				CREATE INDEX IF NOT EXISTS idx_%s_shard_key
+					ON %s (shard_key);
+			`, table, table, table)
+
+			if _, err := pool.Exec(ctx, ddl); err != nil {
+				return fmt.Errorf("create index table %s: %w", table, err)
+			}
+		}
+	}
+	return nil
+}
+
 // CreateTables creates the index tables for all registered indexes.
 func (r *Registry) CreateTables(ctx context.Context, pool *pgxpool.Pool, numShards int) error {
 	for indexName := range r.definitions {

@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	ShardConfigPath string
+	IndexConfigPath string
 	Port            string
 	NumShards   int
 	LogLevel    string
@@ -23,6 +24,7 @@ type Config struct {
 func Load() Config {
 	return Config{
 		ShardConfigPath:     getEnvRequired("SHARD_CONFIG_PATH"),
+		IndexConfigPath:     getEnv("INDEX_CONFIG_PATH", ""),
 		Port:                getEnv("PORT", "8080"),
 		NumShards:           getEnvInt("NUM_SHARDS", 64),
 		LogLevel:            getEnv("LOG_LEVEL", "info"),
