@@ -11,12 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ryanbastic/go-mezzanine/internal/api"
-	"github.com/ryanbastic/go-mezzanine/internal/cell"
 	"github.com/ryanbastic/go-mezzanine/internal/config"
 	"github.com/ryanbastic/go-mezzanine/internal/index"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 	"github.com/ryanbastic/go-mezzanine/internal/storage"
-	"github.com/ryanbastic/go-mezzanine/internal/trigger"
 )
 
 func main() {
@@ -71,6 +69,7 @@ func main() {
 		}
 	}()
 
+	logger.Info("running migrations")
 	// Run migrations per backend
 	for _, b := range shardCfg.Backends {
 		pool := pools[b.Name]
@@ -98,20 +97,6 @@ func main() {
 
 	// Initialize index registry
 	indexRegistry := index.NewRegistry()
-
-	// Initialize trigger framework
-	triggerRegistry := trigger.NewRegistry()
-	checkpoint := trigger.NewPostgresCheckpoint(shardPools)
-
-	// Example: register a trigger that logs every new "base" column cell
-	triggerRegistry.Register("base", func(ctx context.Context, c cell.Cell) error {
-		logger.Info("trigger fired", "added_id", c.AddedID, "row_key", c.RowKey, "column", c.ColumnName)
-		return nil
-	})
-
-	watcher := trigger.NewWatcher(triggerRegistry, checkpoint, stores, cfg.NumShards, cfg.TriggerPollInterval, cfg.TriggerBatchSize, logger)
-	go watcher.Start(ctx)
-	logger.Info("trigger watcher started")
 
 	// Start HTTP server
 	handler := api.NewServer(logger, router, indexRegistry, cfg.NumShards)
