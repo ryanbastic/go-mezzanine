@@ -38,10 +38,6 @@ func main() {
 	partitionRead(ctx, client)
 }
 
-func ptrTo[T any](v T) *T {
-	return &v
-}
-
 func partitionRead(ctx context.Context, client *mezzanine.APIClient) {
 	fmt.Printf("Testing partition read...\n")
 
