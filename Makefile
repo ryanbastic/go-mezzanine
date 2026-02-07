@@ -4,7 +4,7 @@ build:
 	go build -o bin/mezzanine ./cmd/mezzanine
 
 run: build
-	./bin/mezzanine
+	SHARD_CONFIG_PATH=shards.json ./bin/mezzanine
 
 test:
 	go test ./...
@@ -36,7 +36,7 @@ claude:
 	claude --dangerously-skip-permissions
 
 claude_resume:
-	claude --resume dd93d1da-a859-4148-b51d-6dff9219e84b
+	claude --resume cf97a7f9-f702-47d6-8c3f-5174be26150e
 
 up:
 	docker compose up -d --build

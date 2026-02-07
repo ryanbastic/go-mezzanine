@@ -49,7 +49,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to write profile for %s: %v", u.Name, err)
 		}
-		fmt.Printf("  [profile] %s  row_key=%s  added_id=%d\n", u.Name, rowKey, resp.GetAddedId())
+		fmt.Printf("  [profile] %s (body: %s) row_key=%s  added_id=%d\n", u.Name, resp.GetBody(), rowKey, resp.GetAddedId())
 
 		// Write a "settings" cell for each user
 		settingsBody := map[string]any{
@@ -62,7 +62,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to write settings for %s: %v", u.Name, err)
 		}
-		fmt.Printf("  [settings] %s  added_id=%d\n", u.Name, resp.GetAddedId())
+		fmt.Printf("  [settings] %s (body: %s) added_id=%d\n", u.Name, resp.GetBody(), resp.GetAddedId())
 
 		// Read back the full row
 		row, _, err := client.CellsAPI.GetRow(ctx, rowKey).Execute()
