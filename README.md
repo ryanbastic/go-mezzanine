@@ -4,6 +4,8 @@ A Go implementation of [Uber's Schemaless](https://www.uber.com/blog/schemaless-
 
 Mezzanine stores data as JSON cells addressed by three coordinates: **row key** (UUID), **column name** (string), and **ref key** (version number). It supports hash-based sharding, secondary indexes, an event-driven trigger framework, and a circuit breaker for resilience.
 
+The HTTP API is built with [Huma](https://huma.rocks/), which auto-generates an OpenAPI 3.1 spec from the Go handler types. A generated Go client is included for programmatic access.
+
 ## Architecture
 
 ```
@@ -41,11 +43,12 @@ Shards are distributed across multiple PostgreSQL backends. Each backend owns a 
 | `internal/cell` | Core data model (`Cell`, `CellRef`, `WriteCellRequest`) |
 | `internal/shard` | Deterministic shard routing via FNV-32a |
 | `internal/storage` | PostgreSQL persistence and migrations |
-| `internal/api` | HTTP handlers and middleware |
+| `internal/api` | Huma HTTP handlers, middleware, and route registration |
 | `internal/index` | Secondary index support |
 | `internal/trigger` | Event-driven trigger framework with checkpointing |
 | `internal/circuitbreaker` | Circuit breaker resilience pattern |
 | `internal/config` | Environment-based configuration |
+| `pkg/mezzanine` | Generated Go client (from OpenAPI spec) |
 
 ## Getting Started
 
@@ -112,6 +115,23 @@ All settings are configured via environment variables:
 | `shard_end` | Last shard ID (inclusive) |
 
 An example config for local development is provided in [`shards.json`](shards.json), matching the two Postgres services in `docker-compose.yml`.
+
+## OpenAPI
+
+Huma automatically serves the OpenAPI 3.1 spec from the running server:
+
+```bash
+curl http://localhost:8080/openapi.json
+```
+
+A snapshot is checked into the repo at [`openapi.json`](openapi.json). The generated Go client in `pkg/mezzanine` is produced from this spec using [OpenAPI Generator](https://openapi-generator.tech/):
+
+```bash
+# Fetch a fresh spec from a running server and regenerate the client
+make client
+```
+
+This requires Docker (the generator runs in a container). The client uses a builder pattern for optional parameters — see [`pkg/mezzanine/docs/`](pkg/mezzanine/docs/) for per-endpoint usage.
 
 ## API Reference
 
