@@ -364,20 +364,7 @@ shard_id = fnv32a(row_key) % num_shards
 
 Each shard has its own PostgreSQL table (`cells_0000` through `cells_0063`), providing natural partitioning. All versions of a given row key live on the same shard.
 
-Shards are distributed across multiple PostgreSQL backends via the shard config file. Each backend gets its own connection pool and manages its own shard tables, trigger checkpoint rows, and migrations independently.
-
-## Triggers
-
-Triggers react to cell writes asynchronously. The framework polls each shard for new cells (tracked via `added_id`) and invokes registered handler functions.
-
-Handlers must be **idempotent** — they may be called more than once for the same cell if a failure occurs before the checkpoint advances.
-
-```go
-triggerRegistry.Register("profile", func(ctx context.Context, c cell.Cell) error {
-    log.Printf("new profile write: row=%s ref=%d", c.RowKey, c.RefKey)
-    return nil
-})
-```
+Shards are distributed across multiple PostgreSQL backends via the shard config file. Each backend gets its own connection pool, managing its own shard tables and migrations independently.
 
 ## Secondary Indexes
 
