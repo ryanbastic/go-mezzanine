@@ -14,12 +14,20 @@ import (
 )
 
 // NewServer creates an HTTP server with all routes configured.
-func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.Registry, pluginRegistry *trigger.PluginRegistry, notifier *trigger.Notifier, numShards int) http.Handler {
+// backends maps backend names to Pinger instances (e.g. *pgxpool.Pool) for
+// readiness checks. Pass nil when backends are not available (e.g. in tests).
+func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.Registry, pluginRegistry *trigger.PluginRegistry, notifier *trigger.Notifier, numShards int, backends map[string]Pinger) http.Handler {
 	mux := chi.NewRouter()
 
 	mux.Use(RequestID)
 	mux.Use(Logging(logger))
 	mux.Use(Recovery(logger))
+
+	// Health probes registered directly on Chi (need conditional status codes).
+	healthHandler := NewHealthHandler(backends, logger)
+	mux.Get("/v1/livez", healthHandler.Livez)
+	mux.Get("/v1/readyz", healthHandler.Readyz)
+	mux.Get("/v1/health", healthHandler.Readyz)
 
 	config := huma.DefaultConfig("Mezzanine API", "1.0.0")
 	config.Info.Description = "Sharded cell-based data store"
@@ -32,7 +40,6 @@ func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.R
 	registerCellRoutes(api, cellHandler)
 	registerIndexRoutes(api, indexHandler)
 	registerPluginRoutes(api, pluginHandler)
-	registerHealthRoute(api)
 	registerShardRoutes(api, numShards)
 
 	return mux

@@ -45,11 +45,11 @@ func setupIndexTestServer(mockStore index.IndexStore, indexName string, numShard
 	for i := range numShards {
 		registry.RegisterStore(indexName, shard.ID(i), mockStore)
 	}
-	return NewServer(testLogger(), shard.NewRouter(), registry, trigger.NewPluginRegistry(), nil, numShards)
+	return NewServer(testLogger(), shard.NewRouter(), registry, trigger.NewPluginRegistry(), nil, numShards, nil)
 }
 
 func TestQueryIndex_IndexNotFound(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/index/nonexistent/alice@example.com", nil)
 	w := httptest.NewRecorder()
@@ -82,7 +82,7 @@ func TestQueryIndex_UserByEmail_FoundRoute(t *testing.T) {
 		UniqueFields:  []string{"email"},
 	}, 64)
 
-	server := NewServer(testLogger(), shard.NewRouter(), registry, trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), registry, trigger.NewPluginRegistry(), nil, 64, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/index/user_by_email/alice@example.com", nil)
 	w := httptest.NewRecorder()
@@ -104,7 +104,7 @@ func TestWriteCell_UserByEmail_ProfileStored(t *testing.T) {
 	}
 
 	// No index registry — just verify profile cell with email is stored correctly.
-	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 
 	rowKey := uuid.New()
 	body := map[string]any{
@@ -151,29 +151,8 @@ func TestWriteCell_UserByEmail_ProfileStored(t *testing.T) {
 
 // --- Integration tests ---
 
-func TestServer_HealthEndpoint(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
-	w := httptest.NewRecorder()
-
-	server.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("status: got %d, want %d\nbody: %s", w.Code, http.StatusOK, w.Body.String())
-	}
-
-	var resp map[string]string
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if resp["status"] != "ok" {
-		t.Errorf("status field: got %q", resp["status"])
-	}
-}
-
 func TestServer_HasRequestID(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	w := httptest.NewRecorder()
@@ -186,7 +165,7 @@ func TestServer_HasRequestID(t *testing.T) {
 }
 
 func TestServer_NotFound(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -205,7 +184,7 @@ func TestServer_WriteAndGetCell(t *testing.T) {
 		shardRouter.Register(shard.ID(i), store)
 	}
 
-	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 
 	// Write a cell
 	rowKey := uuid.New()
@@ -256,7 +235,7 @@ func TestServer_GetRow_Integration(t *testing.T) {
 		shardRouter.Register(shard.ID(i), store)
 	}
 
-	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shardRouter, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String(), nil)
 	w := httptest.NewRecorder()
@@ -347,7 +326,7 @@ func TestQueryIndex_StoreError(t *testing.T) {
 }
 
 func TestServer_OpenAPISpec(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
 	w := httptest.NewRecorder()

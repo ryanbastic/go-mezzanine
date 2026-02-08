@@ -103,7 +103,7 @@ func testServerWithCells(t *testing.T) *httptest.Server {
 	}
 
 	logger := slog.New(slog.DiscardHandler)
-	handler := api.NewServer(logger, router, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	handler := api.NewServer(logger, router, index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 	return httptest.NewServer(handler)
 }
 
@@ -128,7 +128,7 @@ func testServerWithIndex(t *testing.T) *httptest.Server {
 	}, 64)
 
 	logger := slog.New(slog.DiscardHandler)
-	handler := api.NewServer(logger, router, registry, trigger.NewPluginRegistry(), nil, 64)
+	handler := api.NewServer(logger, router, registry, trigger.NewPluginRegistry(), nil, 64, nil)
 	return httptest.NewServer(handler)
 }
 

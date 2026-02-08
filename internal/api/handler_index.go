@@ -81,26 +81,3 @@ func (h *IndexHandler) QueryIndex(ctx context.Context, input *QueryIndexInput) (
 	return &QueryIndexOutput{Body: resp}, nil
 }
 
-// --- Health ---
-
-type HealthInput struct{}
-
-type HealthResponse struct {
-	Status string `json:"status" doc:"Service health status" example:"ok"`
-}
-
-type HealthOutput struct {
-	Body HealthResponse
-}
-
-func registerHealthRoute(api huma.API) {
-	huma.Register(api, huma.Operation{
-		OperationID: "health-check",
-		Method:      http.MethodGet,
-		Path:        "/v1/health",
-		Summary:     "Health check",
-		Tags:        []string{"health"},
-	}, func(ctx context.Context, input *HealthInput) (*HealthOutput, error) {
-		return &HealthOutput{Body: HealthResponse{Status: "ok"}}, nil
-	})
-}

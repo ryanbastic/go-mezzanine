@@ -13,7 +13,7 @@ import (
 
 func TestGetShardCount(t *testing.T) {
 	const numShards = 16
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, numShards)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, numShards, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/shards/count", nil)
 	w := httptest.NewRecorder()

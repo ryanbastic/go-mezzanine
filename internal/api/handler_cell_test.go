@@ -108,7 +108,7 @@ func setupTestServer(store storage.CellStore, numShards int) http.Handler {
 	for i := 0; i < numShards; i++ {
 		r.Register(shard.ID(i), store)
 	}
-	return NewServer(testLogger(), r, index.NewRegistry(), trigger.NewPluginRegistry(), nil, numShards)
+	return NewServer(testLogger(), r, index.NewRegistry(), trigger.NewPluginRegistry(), nil, numShards, nil)
 }
 
 // --- WriteCell Tests ---
@@ -458,7 +458,7 @@ func TestGetRow_StoreError(t *testing.T) {
 
 func TestWriteCell_ShardRoutingError(t *testing.T) {
 	// No stores registered
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 
 	body := map[string]any{
 		"row_key":     uuid.New().String(),
@@ -480,7 +480,7 @@ func TestWriteCell_ShardRoutingError(t *testing.T) {
 }
 
 func TestGetCell_ShardRoutingError(t *testing.T) {
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), trigger.NewPluginRegistry(), nil, 64, nil)
 
 	rowKey := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/cells/"+rowKey.String()+"/profile/1", nil)

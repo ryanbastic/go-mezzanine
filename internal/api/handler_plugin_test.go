@@ -15,7 +15,7 @@ import (
 
 func setupPluginTestServer() http.Handler {
 	registry := trigger.NewPluginRegistry()
-	return NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), registry, nil, 64)
+	return NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), registry, nil, 64, nil)
 }
 
 func TestRegisterPlugin_Success(t *testing.T) {
@@ -148,7 +148,7 @@ func TestListPlugins_Empty(t *testing.T) {
 
 func TestListPlugins_AfterRegister(t *testing.T) {
 	registry := trigger.NewPluginRegistry()
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), registry, nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), registry, nil, 64, nil)
 
 	// Register a plugin
 	body := map[string]any{
@@ -186,7 +186,7 @@ func TestListPlugins_AfterRegister(t *testing.T) {
 
 func TestGetPlugin_Success(t *testing.T) {
 	registry := trigger.NewPluginRegistry()
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), registry, nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), registry, nil, 64, nil)
 
 	// Register
 	p := &trigger.Plugin{
@@ -241,7 +241,7 @@ func TestGetPlugin_InvalidID(t *testing.T) {
 
 func TestDeletePlugin_Success(t *testing.T) {
 	registry := trigger.NewPluginRegistry()
-	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), registry, nil, 64)
+	server := NewServer(testLogger(), shard.NewRouter(), index.NewRegistry(), registry, nil, 64, nil)
 
 	p := &trigger.Plugin{
 		Name:              "test",

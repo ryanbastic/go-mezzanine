@@ -146,8 +146,14 @@ func main() {
 	rpcClient := trigger.NewRPCClient(cfg.TriggerRetryMax, cfg.TriggerRetryBackoff, cfg.TriggerRPCTimeout)
 	notifier := trigger.NewNotifier(pluginRegistry, rpcClient, logger)
 
+	// Build backend pinger map for readiness checks
+	backends := make(map[string]api.Pinger, len(pools))
+	for name, pool := range pools {
+		backends[name] = pool
+	}
+
 	// Start HTTP server
-	handler := api.NewServer(logger, router, indexRegistry, pluginRegistry, notifier, cfg.NumShards)
+	handler := api.NewServer(logger, router, indexRegistry, pluginRegistry, notifier, cfg.NumShards, backends)
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      handler,
