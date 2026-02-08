@@ -111,6 +111,7 @@ func main() {
 					SourceColumn:  idx.SourceColumn,
 					ShardKeyField: idx.ShardKeyField,
 					Fields:        idx.Fields,
+					UniqueFields:  idx.UniqueFields,
 				}, b.ShardStart, b.ShardEnd)
 			}
 		}

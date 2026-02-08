@@ -241,7 +241,7 @@ paths:
       summary: Health check
       tags:
       - health
-  /v1/index/{index_name}/{shard_key}:
+  /v1/index/{index_name}/{value}:
     get:
       operationId: query-index
       parameters:
@@ -254,14 +254,14 @@ paths:
           description: Secondary index name
           type: string
         style: simple
-      - description: Shard key UUID
+      - description: Lookup value (e.g. email address)
         explode: false
         in: path
-        name: shard_key
+        name: value
         required: true
         schema:
-          description: Shard key UUID
-          format: uuid
+          description: Lookup value (e.g. email address)
+          minLength: 1
           type: string
         style: simple
       responses:
@@ -430,7 +430,7 @@ components:
           description: Row key UUID
           type: string
         shard_key:
-          description: Shard key UUID
+          description: Shard key value
           type: string
       required:
       - added_id

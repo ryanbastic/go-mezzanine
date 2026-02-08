@@ -12,6 +12,7 @@ type IndexDefinition struct {
 	SourceColumn  string   `json:"source_column"`
 	ShardKeyField string   `json:"shard_key_field"`
 	Fields        []string `json:"fields"`
+	UniqueFields  []string `json:"unique_fields"`
 }
 
 // IndexConfig holds the list of secondary index definitions.

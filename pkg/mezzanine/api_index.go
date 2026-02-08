@@ -27,7 +27,7 @@ type ApiQueryIndexRequest struct {
 	ctx context.Context
 	ApiService *IndexAPIService
 	indexName string
-	shardKey string
+	value string
 }
 
 func (r ApiQueryIndexRequest) Execute() ([]IndexEntryResponse, *http.Response, error) {
@@ -39,15 +39,15 @@ QueryIndex Query secondary index
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param indexName Secondary index name
- @param shardKey Shard key UUID
+ @param value Lookup value (e.g. email address)
  @return ApiQueryIndexRequest
 */
-func (a *IndexAPIService) QueryIndex(ctx context.Context, indexName string, shardKey string) ApiQueryIndexRequest {
+func (a *IndexAPIService) QueryIndex(ctx context.Context, indexName string, value string) ApiQueryIndexRequest {
 	return ApiQueryIndexRequest{
 		ApiService: a,
 		ctx: ctx,
 		indexName: indexName,
-		shardKey: shardKey,
+		value: value,
 	}
 }
 
@@ -66,9 +66,9 @@ func (a *IndexAPIService) QueryIndexExecute(r ApiQueryIndexRequest) ([]IndexEntr
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/index/{index_name}/{shard_key}"
+	localVarPath := localBasePath + "/v1/index/{index_name}/{value}"
 	localVarPath = strings.Replace(localVarPath, "{"+"index_name"+"}", url.PathEscape(parameterValueToString(r.indexName, "indexName")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"shard_key"+"}", url.PathEscape(parameterValueToString(r.shardKey, "shardKey")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"value"+"}", url.PathEscape(parameterValueToString(r.value, "value")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

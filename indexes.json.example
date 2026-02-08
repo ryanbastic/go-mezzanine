@@ -3,8 +3,9 @@
     {
       "name": "user_by_email",
       "source_column": "profile",
-      "shard_key_field": "org_id",
-      "fields": ["email", "display_name"]
+      "shard_key_field": "email",
+      "fields": ["email", "display_name"],
+      "unique_fields": ["email"]
     }
   ]
 }

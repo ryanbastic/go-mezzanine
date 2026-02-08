@@ -2,6 +2,7 @@ package index
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -42,7 +43,7 @@ func TestRegistry_Register_And_StoreFor(t *testing.T) {
 	def := Definition{
 		Name:          "user_by_email",
 		SourceColumn:  "profile",
-		ShardKeyField: "email_hash",
+		ShardKeyField: "email",
 		Fields:        []string{"email", "name"},
 	}
 
@@ -87,7 +88,7 @@ func TestRegistry_GetDefinition(t *testing.T) {
 	def := Definition{
 		Name:          "user_by_email",
 		SourceColumn:  "profile",
-		ShardKeyField: "email_hash",
+		ShardKeyField: "email",
 		Fields:        []string{"email", "name"},
 	}
 	r.Register(nil, def, 2)
@@ -102,7 +103,7 @@ func TestRegistry_GetDefinition(t *testing.T) {
 	if got.SourceColumn != "profile" {
 		t.Errorf("SourceColumn: got %q", got.SourceColumn)
 	}
-	if got.ShardKeyField != "email_hash" {
+	if got.ShardKeyField != "email" {
 		t.Errorf("ShardKeyField: got %q", got.ShardKeyField)
 	}
 	if len(got.Fields) != 2 {
@@ -164,42 +165,96 @@ func TestDefinition_Fields(t *testing.T) {
 	}
 }
 
-// --- extractUUID Tests ---
-
-func TestExtractUUID_Valid(t *testing.T) {
-	id := uuid.New()
-	body := []byte(`{"user_id":"` + id.String() + `"}`)
-
-	got, err := extractUUID(json.RawMessage(body), "user_id")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestDefinition_UniqueFields(t *testing.T) {
+	def := Definition{
+		Name:          "user_by_email",
+		SourceColumn:  "profile",
+		ShardKeyField: "email",
+		Fields:        []string{"email", "display_name"},
+		UniqueFields:  []string{"email"},
 	}
-	if got != id {
-		t.Errorf("got %s, want %s", got, id)
+
+	if len(def.UniqueFields) != 1 || def.UniqueFields[0] != "email" {
+		t.Errorf("UniqueFields: got %v", def.UniqueFields)
 	}
 }
 
-func TestExtractUUID_MissingField(t *testing.T) {
+func TestBuildTableDDL_NoUniqueFields(t *testing.T) {
+	ddl := buildTableDDL("index_test_0000", nil)
+	if !strings.Contains(ddl, "CREATE TABLE IF NOT EXISTS index_test_0000") {
+		t.Error("missing CREATE TABLE")
+	}
+	if !strings.Contains(ddl, "idx_index_test_0000_shard_key") {
+		t.Error("missing shard_key index")
+	}
+	if strings.Contains(ddl, "UNIQUE") {
+		t.Error("should not contain UNIQUE when no unique fields")
+	}
+}
+
+func TestBuildTableDDL_WithUniqueFields(t *testing.T) {
+	ddl := buildTableDDL("index_user_by_email_0000", []string{"email"})
+	if !strings.Contains(ddl, "CREATE TABLE IF NOT EXISTS index_user_by_email_0000") {
+		t.Error("missing CREATE TABLE")
+	}
+	if !strings.Contains(ddl, "CREATE UNIQUE INDEX IF NOT EXISTS idx_index_user_by_email_0000_email") {
+		t.Error("missing unique index on email")
+	}
+	if !strings.Contains(ddl, "(body->>'email')") {
+		t.Error("missing body->>'email' expression")
+	}
+}
+
+func TestBuildTableDDL_MultipleUniqueFields(t *testing.T) {
+	ddl := buildTableDDL("index_test_0000", []string{"email", "username"})
+	if !strings.Contains(ddl, "idx_index_test_0000_email") {
+		t.Error("missing unique index on email")
+	}
+	if !strings.Contains(ddl, "idx_index_test_0000_username") {
+		t.Error("missing unique index on username")
+	}
+}
+
+// --- extractString Tests ---
+
+func TestExtractString_Valid(t *testing.T) {
+	body := []byte(`{"email":"alice@example.com"}`)
+
+	got, err := extractString(json.RawMessage(body), "email")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "alice@example.com" {
+		t.Errorf("got %s, want alice@example.com", got)
+	}
+}
+
+func TestExtractString_UUID(t *testing.T) {
+	id := uuid.New()
+	body := []byte(`{"user_id":"` + id.String() + `"}`)
+
+	got, err := extractString(json.RawMessage(body), "user_id")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != id.String() {
+		t.Errorf("got %s, want %s", got, id.String())
+	}
+}
+
+func TestExtractString_MissingField(t *testing.T) {
 	body := []byte(`{"other":"value"}`)
-	_, err := extractUUID(json.RawMessage(body), "user_id")
+	_, err := extractString(json.RawMessage(body), "email")
 	if err == nil {
 		t.Fatal("expected error for missing field")
 	}
 }
 
-func TestExtractUUID_NonStringField(t *testing.T) {
-	body := []byte(`{"user_id":12345}`)
-	_, err := extractUUID(json.RawMessage(body), "user_id")
+func TestExtractString_NonStringField(t *testing.T) {
+	body := []byte(`{"email":12345}`)
+	_, err := extractString(json.RawMessage(body), "email")
 	if err == nil {
 		t.Fatal("expected error for non-string field")
-	}
-}
-
-func TestExtractUUID_InvalidUUID(t *testing.T) {
-	body := []byte(`{"user_id":"not-a-uuid"}`)
-	_, err := extractUUID(json.RawMessage(body), "user_id")
-	if err == nil {
-		t.Fatal("expected error for invalid UUID")
 	}
 }
 
@@ -310,7 +365,7 @@ func TestRegistry_RegisterRange_SingleRange(t *testing.T) {
 	def := Definition{
 		Name:          "user_by_email",
 		SourceColumn:  "profile",
-		ShardKeyField: "org_id",
+		ShardKeyField: "email",
 		Fields:        []string{"email"},
 	}
 
@@ -337,7 +392,7 @@ func TestRegistry_RegisterRange_MultipleRanges(t *testing.T) {
 	def := Definition{
 		Name:          "user_by_email",
 		SourceColumn:  "profile",
-		ShardKeyField: "org_id",
+		ShardKeyField: "email",
 		Fields:        []string{"email"},
 	}
 
@@ -377,7 +432,7 @@ func TestRegistry_RegisterRange_DefinitionPreserved(t *testing.T) {
 	def := Definition{
 		Name:          "user_by_email",
 		SourceColumn:  "profile",
-		ShardKeyField: "org_id",
+		ShardKeyField: "email",
 		Fields:        []string{"email", "name"},
 	}
 	r.RegisterRange(nil, def, 0, 1)
@@ -392,7 +447,7 @@ func TestRegistry_RegisterRange_DefinitionPreserved(t *testing.T) {
 	if got.SourceColumn != "profile" {
 		t.Errorf("SourceColumn: got %q", got.SourceColumn)
 	}
-	if got.ShardKeyField != "org_id" {
+	if got.ShardKeyField != "email" {
 		t.Errorf("ShardKeyField: got %q", got.ShardKeyField)
 	}
 	if len(got.Fields) != 2 {
@@ -400,19 +455,123 @@ func TestRegistry_RegisterRange_DefinitionPreserved(t *testing.T) {
 	}
 }
 
-func TestRegistry_IndexCell_ExtractUUIDError(t *testing.T) {
+func TestRegistry_UserByEmail_IndexCell_FieldExtraction(t *testing.T) {
+	r := NewRegistry()
+	def := Definition{
+		Name:          "user_by_email",
+		SourceColumn:  "profile",
+		ShardKeyField: "email",
+		Fields:        []string{"email", "display_name"},
+		UniqueFields:  []string{"email"},
+	}
+	r.Register(nil, def, 4)
+
+	rowKey := uuid.New()
+
+	// Verify that ForColumn finds the user_by_email definition.
+	defs := r.ForColumn("profile")
+	if len(defs) != 1 {
+		t.Fatalf("ForColumn: got %d, want 1", len(defs))
+	}
+	if defs[0].Name != "user_by_email" {
+		t.Errorf("Name: got %q", defs[0].Name)
+	}
+
+	// Verify field extraction matches the definition.
+	body := json.RawMessage(`{
+		"org_id": "some-org",
+		"email": "alice@example.com",
+		"display_name": "Alice Smith",
+		"internal_notes": "should not appear"
+	}`)
+
+	gotEmail, err := extractString(body, "email")
+	if err != nil {
+		t.Fatalf("extractString: %v", err)
+	}
+	if gotEmail != "alice@example.com" {
+		t.Errorf("shard key: got %s, want alice@example.com", gotEmail)
+	}
+
+	gotBody, err := extractFields(body, def.Fields)
+	if err != nil {
+		t.Fatalf("extractFields: %v", err)
+	}
+
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(gotBody, &m); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if len(m) != 2 {
+		t.Errorf("body keys: got %d, want 2", len(m))
+	}
+	if string(m["email"]) != `"alice@example.com"` {
+		t.Errorf("email: got %s", string(m["email"]))
+	}
+	if string(m["display_name"]) != `"Alice Smith"` {
+		t.Errorf("display_name: got %s", string(m["display_name"]))
+	}
+	if _, ok := m["internal_notes"]; ok {
+		t.Error("internal_notes should not be extracted")
+	}
+
+	// Verify shard routing for the index entry.
+	shardID := shard.ForKey("alice@example.com", 4)
+	store, ok := r.StoreFor("user_by_email", shardID)
+	if !ok {
+		t.Fatalf("StoreFor shard %d: not found", shardID)
+	}
+	if store == nil {
+		t.Fatal("store is nil")
+	}
+
+	// Verify the definition roundtrip.
+	gotDef, ok := r.GetDefinition("user_by_email")
+	if !ok {
+		t.Fatal("GetDefinition: not found")
+	}
+	if len(gotDef.UniqueFields) != 1 || gotDef.UniqueFields[0] != "email" {
+		t.Errorf("UniqueFields: got %v", gotDef.UniqueFields)
+	}
+
+	_ = rowKey // used by callers to build cells
+}
+
+func TestRegistry_UserByEmail_NonProfileColumn_Skipped(t *testing.T) {
+	r := NewRegistry()
+	r.Register(nil, Definition{
+		Name:          "user_by_email",
+		SourceColumn:  "profile",
+		ShardKeyField: "email",
+		Fields:        []string{"email"},
+		UniqueFields:  []string{"email"},
+	}, 4)
+
+	// Write to a different column — index should be skipped entirely.
+	c := &cell.Cell{
+		RowKey:     uuid.New(),
+		ColumnName: "settings",
+		Body:       json.RawMessage(`{"theme":"dark"}`),
+	}
+
+	if err := r.IndexCell(t.Context(), c, 4); err != nil {
+		t.Fatalf("IndexCell for non-matching column should succeed: %v", err)
+	}
+}
+
+func TestRegistry_IndexCell_ExtractStringError(t *testing.T) {
 	r := NewRegistry()
 	r.Register(nil, Definition{
 		Name:          "idx",
 		SourceColumn:  "profile",
-		ShardKeyField: "user_id",
+		ShardKeyField: "email",
 		Fields:        []string{"email"},
 	}, 4)
 
 	c := &cell.Cell{
 		RowKey:     uuid.New(),
 		ColumnName: "profile",
-		Body:       json.RawMessage(`{"email":"a@b.com"}`), // missing user_id
+		Body:       json.RawMessage(`{"name":"Alice"}`), // missing email
 	}
 
 	err := r.IndexCell(t.Context(), c, 4)

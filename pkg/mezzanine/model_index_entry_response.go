@@ -29,7 +29,7 @@ type IndexEntryResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	// Row key UUID
 	RowKey string `json:"row_key"`
-	// Shard key UUID
+	// Shard key value
 	ShardKey string `json:"shard_key"`
 }
 

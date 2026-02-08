@@ -652,12 +652,20 @@ func formatErrorMessage(status string, v interface{}) string {
 	if metaValue.Kind() == reflect.Struct {
 		field := metaValue.FieldByName("Title")
 		if field != (reflect.Value{}) {
-			str = fmt.Sprintf("%s", field.Interface())
+			if field.Kind() == reflect.Ptr && !field.IsNil() {
+				str = fmt.Sprintf("%s", field.Elem().Interface())
+			} else if field.Kind() != reflect.Ptr {
+				str = fmt.Sprintf("%s", field.Interface())
+			}
 		}
 
 		field = metaValue.FieldByName("Detail")
 		if field != (reflect.Value{}) {
-			str = fmt.Sprintf("%s (%s)", str, field.Interface())
+			if field.Kind() == reflect.Ptr && !field.IsNil() {
+				str = fmt.Sprintf("%s (%s)", str, field.Elem().Interface())
+			} else if field.Kind() != reflect.Ptr {
+				str = fmt.Sprintf("%s (%s)", str, field.Interface())
+			}
 		}
 	}
 

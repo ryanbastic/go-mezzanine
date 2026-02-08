@@ -16,3 +16,10 @@ func ForRowKey(rowKey uuid.UUID, numShards int) ID {
 	h.Write(b[:])
 	return ID(int(h.Sum32()) % numShards)
 }
+
+// ForKey computes the shard for an arbitrary string key.
+func ForKey(key string, numShards int) ID {
+	h := fnv.New32a()
+	h.Write([]byte(key))
+	return ID(int(h.Sum32()) % numShards)
+}

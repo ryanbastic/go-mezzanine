@@ -8,7 +8,7 @@ Name | Type | Description | Notes
 **Body** | **interface{}** |  | 
 **CreatedAt** | **time.Time** | Creation timestamp | 
 **RowKey** | **string** | Row key UUID | 
-**ShardKey** | **string** | Shard key UUID | 
+**ShardKey** | **string** | Shard key value |
 
 ## Methods
 

@@ -86,9 +86,48 @@ func TestID_Type(t *testing.T) {
 	}
 }
 
+func TestForKey_Deterministic(t *testing.T) {
+	key := "alice@example.com"
+	numShards := 64
+
+	first := ForKey(key, numShards)
+	for i := 0; i < 100; i++ {
+		got := ForKey(key, numShards)
+		if got != first {
+			t.Fatalf("iteration %d: got shard %d, want %d", i, got, first)
+		}
+	}
+}
+
+func TestForKey_InRange(t *testing.T) {
+	keys := []string{"a@b.com", "hello", "", "very-long-string-value-here"}
+	shardCounts := []int{1, 2, 4, 8, 16, 32, 64}
+	for _, numShards := range shardCounts {
+		for _, key := range keys {
+			got := ForKey(key, numShards)
+			if int(got) < 0 || int(got) >= numShards {
+				t.Errorf("numShards=%d key=%q: got shard %d out of range [0,%d)", numShards, key, got, numShards)
+			}
+		}
+	}
+}
+
+func TestForKey_SingleShard(t *testing.T) {
+	got := ForKey("anything", 1)
+	if got != 0 {
+		t.Errorf("with 1 shard, expected 0 but got %d", got)
+	}
+}
+
 func BenchmarkForRowKey(b *testing.B) {
 	key := uuid.New()
 	for i := 0; i < b.N; i++ {
 		ForRowKey(key, 64)
+	}
+}
+
+func BenchmarkForKey(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		ForKey("alice@example.com", 64)
 	}
 }

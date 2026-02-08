@@ -4,13 +4,13 @@ All URIs are relative to *http://localhost*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**QueryIndex**](IndexAPI.md#QueryIndex) | **Get** /v1/index/{index_name}/{shard_key} | Query secondary index
+[**QueryIndex**](IndexAPI.md#QueryIndex) | **Get** /v1/index/{index_name}/{value} | Query secondary index
 
 
 
 ## QueryIndex
 
-> []IndexEntryResponse QueryIndex(ctx, indexName, shardKey).Execute()
+> []IndexEntryResponse QueryIndex(ctx, indexName, value).Execute()
 
 Query secondary index
 
@@ -27,12 +27,12 @@ import (
 )
 
 func main() {
-	indexName := "indexName_example" // string | Secondary index name
-	shardKey := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Shard key UUID
+	indexName := "user_by_email" // string | Secondary index name
+	value := "alice@example.com" // string | Lookup value (e.g. email address)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.IndexAPI.QueryIndex(context.Background(), indexName, shardKey).Execute()
+	resp, r, err := apiClient.IndexAPI.QueryIndex(context.Background(), indexName, value).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `IndexAPI.QueryIndex``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -48,8 +48,8 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**indexName** | **string** | Secondary index name | 
-**shardKey** | **string** | Shard key UUID | 
+**indexName** | **string** | Secondary index name |
+**value** | **string** | Lookup value (e.g. email address) |
 
 ### Other Parameters
 

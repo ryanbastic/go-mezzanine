@@ -22,7 +22,7 @@ func TestLoadIndexConfig_Valid_SingleIndex(t *testing.T) {
 		"indexes": [{
 			"name": "user_by_email",
 			"source_column": "profile",
-			"shard_key_field": "org_id",
+			"shard_key_field": "email",
 			"fields": ["email", "display_name"]
 		}]
 	}`
@@ -41,8 +41,8 @@ func TestLoadIndexConfig_Valid_SingleIndex(t *testing.T) {
 	if ic.Indexes[0].SourceColumn != "profile" {
 		t.Errorf("got source_column %q, want %q", ic.Indexes[0].SourceColumn, "profile")
 	}
-	if ic.Indexes[0].ShardKeyField != "org_id" {
-		t.Errorf("got shard_key_field %q, want %q", ic.Indexes[0].ShardKeyField, "org_id")
+	if ic.Indexes[0].ShardKeyField != "email" {
+		t.Errorf("got shard_key_field %q, want %q", ic.Indexes[0].ShardKeyField, "email")
 	}
 	if len(ic.Indexes[0].Fields) != 2 {
 		t.Errorf("got %d fields, want 2", len(ic.Indexes[0].Fields))
@@ -55,7 +55,7 @@ func TestLoadIndexConfig_Valid_MultipleIndexes(t *testing.T) {
 			{
 				"name": "user_by_email",
 				"source_column": "profile",
-				"shard_key_field": "org_id",
+				"shard_key_field": "email",
 				"fields": ["email"]
 			},
 			{
@@ -113,7 +113,7 @@ func TestLoadIndexConfig_EmptyName(t *testing.T) {
 		"indexes": [{
 			"name": "",
 			"source_column": "profile",
-			"shard_key_field": "org_id",
+			"shard_key_field": "email",
 			"fields": ["email"]
 		}]
 	}`
@@ -134,7 +134,7 @@ func TestLoadIndexConfig_DuplicateName(t *testing.T) {
 			{
 				"name": "dup",
 				"source_column": "profile",
-				"shard_key_field": "org_id",
+				"shard_key_field": "email",
 				"fields": ["email"]
 			},
 			{
@@ -161,7 +161,7 @@ func TestLoadIndexConfig_EmptySourceColumn(t *testing.T) {
 		"indexes": [{
 			"name": "test",
 			"source_column": "",
-			"shard_key_field": "org_id",
+			"shard_key_field": "email",
 			"fields": ["email"]
 		}]
 	}`
@@ -196,12 +196,56 @@ func TestLoadIndexConfig_EmptyShardKeyField(t *testing.T) {
 	}
 }
 
+func TestLoadIndexConfig_UniqueFields(t *testing.T) {
+	cfg := `{
+		"indexes": [{
+			"name": "user_by_email",
+			"source_column": "profile",
+			"shard_key_field": "email",
+			"fields": ["email", "display_name"],
+			"unique_fields": ["email"]
+		}]
+	}`
+	path := writeTempIndexConfig(t, cfg)
+
+	ic, err := LoadIndexConfig(path)
+	if err != nil {
+		t.Fatalf("LoadIndexConfig: %v", err)
+	}
+	if len(ic.Indexes[0].UniqueFields) != 1 {
+		t.Errorf("got %d unique_fields, want 1", len(ic.Indexes[0].UniqueFields))
+	}
+	if ic.Indexes[0].UniqueFields[0] != "email" {
+		t.Errorf("got unique_field %q, want %q", ic.Indexes[0].UniqueFields[0], "email")
+	}
+}
+
+func TestLoadIndexConfig_NoUniqueFields_Succeeds(t *testing.T) {
+	cfg := `{
+		"indexes": [{
+			"name": "test",
+			"source_column": "profile",
+			"shard_key_field": "email",
+			"fields": ["email"]
+		}]
+	}`
+	path := writeTempIndexConfig(t, cfg)
+
+	ic, err := LoadIndexConfig(path)
+	if err != nil {
+		t.Fatalf("LoadIndexConfig: %v", err)
+	}
+	if len(ic.Indexes[0].UniqueFields) != 0 {
+		t.Errorf("got %d unique_fields, want 0", len(ic.Indexes[0].UniqueFields))
+	}
+}
+
 func TestLoadIndexConfig_EmptyFields_Succeeds(t *testing.T) {
 	cfg := `{
 		"indexes": [{
 			"name": "test",
 			"source_column": "profile",
-			"shard_key_field": "org_id",
+			"shard_key_field": "email",
 			"fields": []
 		}]
 	}`
