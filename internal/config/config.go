@@ -14,6 +14,18 @@ type Config struct {
 	NumShards   int
 	LogLevel    string
 
+	// HTTP server timeouts
+	HTTPReadTimeout  time.Duration
+	HTTPWriteTimeout time.Duration
+	HTTPIdleTimeout  time.Duration
+
+	// Database connection pool
+	DBMaxConns         int
+	DBMinConns         int
+	DBMaxConnLifetime  time.Duration
+	DBMaxConnIdleTime  time.Duration
+	DBHealthCheckPeriod time.Duration
+
 	// Trigger framework
 	TriggerRetryMax     int
 	TriggerRetryBackoff time.Duration
@@ -23,11 +35,22 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		ShardConfigPath:     getEnvRequired("SHARD_CONFIG_PATH"),
-		IndexConfigPath:     getEnv("INDEX_CONFIG_PATH", ""),
-		Port:                getEnv("PORT", "8080"),
-		NumShards:           getEnvInt("NUM_SHARDS", 64),
-		LogLevel:            getEnv("LOG_LEVEL", "info"),
+		ShardConfigPath: getEnvRequired("SHARD_CONFIG_PATH"),
+		IndexConfigPath: getEnv("INDEX_CONFIG_PATH", ""),
+		Port:            getEnv("PORT", "8080"),
+		NumShards:       getEnvInt("NUM_SHARDS", 64),
+		LogLevel:        getEnv("LOG_LEVEL", "info"),
+
+		HTTPReadTimeout:  getEnvDuration("HTTP_READ_TIMEOUT", 5*time.Second),
+		HTTPWriteTimeout: getEnvDuration("HTTP_WRITE_TIMEOUT", 10*time.Second),
+		HTTPIdleTimeout:  getEnvDuration("HTTP_IDLE_TIMEOUT", 120*time.Second),
+
+		DBMaxConns:          getEnvInt("DB_MAX_CONNS", 20),
+		DBMinConns:          getEnvInt("DB_MIN_CONNS", 2),
+		DBMaxConnLifetime:   getEnvDuration("DB_MAX_CONN_LIFETIME", 30*time.Minute),
+		DBMaxConnIdleTime:   getEnvDuration("DB_MAX_CONN_IDLE_TIME", 5*time.Minute),
+		DBHealthCheckPeriod: getEnvDuration("DB_HEALTH_CHECK_PERIOD", 30*time.Second),
+
 		TriggerRetryMax:     getEnvInt("TRIGGER_RETRY_MAX", 3),
 		TriggerRetryBackoff: getEnvDuration("TRIGGER_RETRY_BACKOFF", 100*time.Millisecond),
 		TriggerRPCTimeout:   getEnvDuration("TRIGGER_RPC_TIMEOUT", 5*time.Second),

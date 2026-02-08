@@ -51,7 +51,18 @@ func main() {
 	// Create one pool per backend, ping each
 	pools := make(map[string]*pgxpool.Pool, len(shardCfg.Backends))
 	for _, b := range shardCfg.Backends {
-		pool, err := pgxpool.New(ctx, b.DatabaseURL)
+		poolCfg, err := pgxpool.ParseConfig(b.DatabaseURL)
+		if err != nil {
+			logger.Error("failed to parse database URL", "backend", b.Name, "error", err)
+			os.Exit(1)
+		}
+		poolCfg.MaxConns = int32(cfg.DBMaxConns)
+		poolCfg.MinConns = int32(cfg.DBMinConns)
+		poolCfg.MaxConnLifetime = cfg.DBMaxConnLifetime
+		poolCfg.MaxConnIdleTime = cfg.DBMaxConnIdleTime
+		poolCfg.HealthCheckPeriod = cfg.DBHealthCheckPeriod
+
+		pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 		if err != nil {
 			logger.Error("failed to connect to backend", "backend", b.Name, "error", err)
 			os.Exit(1)
@@ -61,7 +72,8 @@ func main() {
 			os.Exit(1)
 		}
 		pools[b.Name] = pool
-		logger.Info("connected to backend", "backend", b.Name, "shards", []int{b.ShardStart, b.ShardEnd})
+		logger.Info("connected to backend", "backend", b.Name, "shards", []int{b.ShardStart, b.ShardEnd},
+			"maxConns", cfg.DBMaxConns, "minConns", cfg.DBMinConns)
 	}
 	defer func() {
 		for name, pool := range pools {
@@ -137,8 +149,11 @@ func main() {
 	// Start HTTP server
 	handler := api.NewServer(logger, router, indexRegistry, pluginRegistry, notifier, cfg.NumShards)
 	srv := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: handler,
+		Addr:         ":" + cfg.Port,
+		Handler:      handler,
+		ReadTimeout:  cfg.HTTPReadTimeout,
+		WriteTimeout: cfg.HTTPWriteTimeout,
+		IdleTimeout:  cfg.HTTPIdleTimeout,
 	}
 
 	go func() {

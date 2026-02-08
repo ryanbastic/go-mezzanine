@@ -12,9 +12,14 @@ func TestLoad_Defaults(t *testing.T) {
 	defer os.Unsetenv("SHARD_CONFIG_PATH")
 
 	// Clear optional env vars to test defaults
-	os.Unsetenv("PORT")
-	os.Unsetenv("NUM_SHARDS")
-	os.Unsetenv("LOG_LEVEL")
+	for _, k := range []string{
+		"PORT", "NUM_SHARDS", "LOG_LEVEL",
+		"HTTP_READ_TIMEOUT", "HTTP_WRITE_TIMEOUT", "HTTP_IDLE_TIMEOUT",
+		"DB_MAX_CONNS", "DB_MIN_CONNS", "DB_MAX_CONN_LIFETIME",
+		"DB_MAX_CONN_IDLE_TIME", "DB_HEALTH_CHECK_PERIOD",
+	} {
+		os.Unsetenv(k)
+	}
 	cfg := Load()
 
 	if cfg.ShardConfigPath != "/tmp/shards.json" {
@@ -32,20 +37,59 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.IndexConfigPath != "" {
 		t.Errorf("IndexConfigPath: got %q, want empty", cfg.IndexConfigPath)
 	}
+
+	// HTTP timeout defaults
+	if cfg.HTTPReadTimeout != 5*time.Second {
+		t.Errorf("HTTPReadTimeout: got %v, want %v", cfg.HTTPReadTimeout, 5*time.Second)
+	}
+	if cfg.HTTPWriteTimeout != 10*time.Second {
+		t.Errorf("HTTPWriteTimeout: got %v, want %v", cfg.HTTPWriteTimeout, 10*time.Second)
+	}
+	if cfg.HTTPIdleTimeout != 120*time.Second {
+		t.Errorf("HTTPIdleTimeout: got %v, want %v", cfg.HTTPIdleTimeout, 120*time.Second)
+	}
+
+	// DB pool defaults
+	if cfg.DBMaxConns != 20 {
+		t.Errorf("DBMaxConns: got %d, want %d", cfg.DBMaxConns, 20)
+	}
+	if cfg.DBMinConns != 2 {
+		t.Errorf("DBMinConns: got %d, want %d", cfg.DBMinConns, 2)
+	}
+	if cfg.DBMaxConnLifetime != 30*time.Minute {
+		t.Errorf("DBMaxConnLifetime: got %v, want %v", cfg.DBMaxConnLifetime, 30*time.Minute)
+	}
+	if cfg.DBMaxConnIdleTime != 5*time.Minute {
+		t.Errorf("DBMaxConnIdleTime: got %v, want %v", cfg.DBMaxConnIdleTime, 5*time.Minute)
+	}
+	if cfg.DBHealthCheckPeriod != 30*time.Second {
+		t.Errorf("DBHealthCheckPeriod: got %v, want %v", cfg.DBHealthCheckPeriod, 30*time.Second)
+	}
 }
 
 func TestLoad_CustomValues(t *testing.T) {
-	os.Setenv("SHARD_CONFIG_PATH", "/custom/path.json")
-	os.Setenv("INDEX_CONFIG_PATH", "/custom/indexes.json")
-	os.Setenv("PORT", "9090")
-	os.Setenv("NUM_SHARDS", "128")
-	os.Setenv("LOG_LEVEL", "debug")
+	envs := map[string]string{
+		"SHARD_CONFIG_PATH":     "/custom/path.json",
+		"INDEX_CONFIG_PATH":     "/custom/indexes.json",
+		"PORT":                  "9090",
+		"NUM_SHARDS":            "128",
+		"LOG_LEVEL":             "debug",
+		"HTTP_READ_TIMEOUT":     "15s",
+		"HTTP_WRITE_TIMEOUT":    "30s",
+		"HTTP_IDLE_TIMEOUT":     "60s",
+		"DB_MAX_CONNS":          "50",
+		"DB_MIN_CONNS":          "5",
+		"DB_MAX_CONN_LIFETIME":  "1h",
+		"DB_MAX_CONN_IDLE_TIME": "10m",
+		"DB_HEALTH_CHECK_PERIOD": "1m",
+	}
+	for k, v := range envs {
+		os.Setenv(k, v)
+	}
 	defer func() {
-		os.Unsetenv("SHARD_CONFIG_PATH")
-		os.Unsetenv("INDEX_CONFIG_PATH")
-		os.Unsetenv("PORT")
-		os.Unsetenv("NUM_SHARDS")
-		os.Unsetenv("LOG_LEVEL")
+		for k := range envs {
+			os.Unsetenv(k)
+		}
 	}()
 
 	cfg := Load()
@@ -64,6 +108,30 @@ func TestLoad_CustomValues(t *testing.T) {
 	}
 	if cfg.LogLevel != "debug" {
 		t.Errorf("LogLevel: got %q", cfg.LogLevel)
+	}
+	if cfg.HTTPReadTimeout != 15*time.Second {
+		t.Errorf("HTTPReadTimeout: got %v", cfg.HTTPReadTimeout)
+	}
+	if cfg.HTTPWriteTimeout != 30*time.Second {
+		t.Errorf("HTTPWriteTimeout: got %v", cfg.HTTPWriteTimeout)
+	}
+	if cfg.HTTPIdleTimeout != 60*time.Second {
+		t.Errorf("HTTPIdleTimeout: got %v", cfg.HTTPIdleTimeout)
+	}
+	if cfg.DBMaxConns != 50 {
+		t.Errorf("DBMaxConns: got %d", cfg.DBMaxConns)
+	}
+	if cfg.DBMinConns != 5 {
+		t.Errorf("DBMinConns: got %d", cfg.DBMinConns)
+	}
+	if cfg.DBMaxConnLifetime != time.Hour {
+		t.Errorf("DBMaxConnLifetime: got %v", cfg.DBMaxConnLifetime)
+	}
+	if cfg.DBMaxConnIdleTime != 10*time.Minute {
+		t.Errorf("DBMaxConnIdleTime: got %v", cfg.DBMaxConnIdleTime)
+	}
+	if cfg.DBHealthCheckPeriod != time.Minute {
+		t.Errorf("DBHealthCheckPeriod: got %v", cfg.DBHealthCheckPeriod)
 	}
 }
 
