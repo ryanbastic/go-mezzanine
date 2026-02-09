@@ -8,7 +8,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ryanbastic/go-mezzanine/internal/index"
+	"github.com/ryanbastic/go-mezzanine/internal/metrics"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 	"github.com/ryanbastic/go-mezzanine/internal/trigger"
 )
@@ -22,12 +24,14 @@ func NewServer(logger *slog.Logger, router *shard.Router, indexRegistry *index.R
 	mux.Use(RequestID)
 	mux.Use(Logging(logger))
 	mux.Use(Recovery(logger))
+	mux.Use(metrics.Metrics)
 
 	// Health probes registered directly on Chi (need conditional status codes).
 	healthHandler := NewHealthHandler(backends, logger)
 	mux.Get("/v1/livez", healthHandler.Livez)
 	mux.Get("/v1/readyz", healthHandler.Readyz)
 	mux.Get("/v1/health", healthHandler.Readyz)
+	mux.Handle("/metrics", promhttp.Handler())
 
 	config := huma.DefaultConfig("Mezzanine API", "1.0.0")
 	config.Info.Description = "Sharded cell-based data store"

@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/ryanbastic/go-mezzanine/internal/api"
 	"github.com/ryanbastic/go-mezzanine/internal/config"
 	"github.com/ryanbastic/go-mezzanine/internal/index"
+	"github.com/ryanbastic/go-mezzanine/internal/metrics"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
 	"github.com/ryanbastic/go-mezzanine/internal/storage"
 	"github.com/ryanbastic/go-mezzanine/internal/trigger"
@@ -81,6 +83,10 @@ func main() {
 			logger.Info("closed pool", "backend", name)
 		}
 	}()
+
+	// Register pgxpool metrics collector
+	prometheus.MustRegister(metrics.NewPoolCollector(pools))
+	logger.Info("registered pool metrics collector")
 
 	logger.Info("running migrations")
 	// Run migrations per backend
