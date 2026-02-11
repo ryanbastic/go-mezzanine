@@ -39,16 +39,28 @@ type IndexStore interface {
 
 // Store handles secondary index operations for a single shard.
 type Store struct {
-	pool  *pgxpool.Pool
-	table string
+	pool         *pgxpool.Pool
+	table        string
+	queryTimeout time.Duration
 }
 
 // NewStore creates an index Store for a specific shard.
-func NewStore(pool *pgxpool.Pool, indexName string, shardID int) *Store {
+// queryTimeout sets the per-query context deadline; zero means no timeout.
+func NewStore(pool *pgxpool.Pool, indexName string, shardID int, queryTimeout time.Duration) *Store {
 	return &Store{
-		pool:  pool,
-		table: IndexTable(indexName, shardID),
+		pool:         pool,
+		table:        IndexTable(indexName, shardID),
+		queryTimeout: queryTimeout,
 	}
+}
+
+// withTimeout derives a child context with the configured query timeout.
+// If queryTimeout is zero, the parent context is returned unchanged.
+func (s *Store) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if s.queryTimeout > 0 {
+		return context.WithTimeout(ctx, s.queryTimeout)
+	}
+	return ctx, func() {}
 }
 
 // IndexTable returns the table name for a given index and shard.
@@ -58,6 +70,9 @@ func IndexTable(indexName string, shardID int) string {
 
 // WriteEntry inserts a denormalized entry into the index.
 func (s *Store) WriteEntry(ctx context.Context, entry Entry) error {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
 	query := fmt.Sprintf(`
 		INSERT INTO %s (shard_key, row_key, body)
 		VALUES ($1, $2, $3)
@@ -72,6 +87,9 @@ func (s *Store) WriteEntry(ctx context.Context, entry Entry) error {
 
 // QueryByShardKey returns all index entries for a given shard key.
 func (s *Store) QueryByShardKey(ctx context.Context, shardKey string) ([]Entry, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
 	query := fmt.Sprintf(`
 		SELECT added_id, shard_key, row_key, body, created_at
 		FROM %s
@@ -98,8 +116,9 @@ func (s *Store) QueryByShardKey(ctx context.Context, shardKey string) ([]Entry, 
 
 // Registry holds all index definitions and their per-shard stores.
 type Registry struct {
-	definitions map[string]Definition
-	stores      map[string]map[shard.ID]IndexStore // indexName -> shardID -> IndexStore
+	definitions  map[string]Definition
+	stores       map[string]map[shard.ID]IndexStore // indexName -> shardID -> IndexStore
+	queryTimeout time.Duration
 }
 
 // NewRegistry creates an empty index Registry.
@@ -110,12 +129,18 @@ func NewRegistry() *Registry {
 	}
 }
 
+// SetQueryTimeout configures the per-query context deadline for index stores
+// created by subsequent Register/RegisterRange calls. Zero means no timeout.
+func (r *Registry) SetQueryTimeout(d time.Duration) {
+	r.queryTimeout = d
+}
+
 // Register adds an index definition and creates stores for all shards.
 func (r *Registry) Register(pool *pgxpool.Pool, def Definition, numShards int) {
 	r.definitions[def.Name] = def
 	shardStores := make(map[shard.ID]IndexStore, numShards)
 	for i := range numShards {
-		shardStores[shard.ID(i)] = NewStore(pool, def.Name, i)
+		shardStores[shard.ID(i)] = NewStore(pool, def.Name, i, r.queryTimeout)
 	}
 	r.stores[def.Name] = shardStores
 }
@@ -236,7 +261,7 @@ func (r *Registry) RegisterRange(pool *pgxpool.Pool, def Definition, shardStart,
 		r.stores[def.Name] = shardStores
 	}
 	for i := shardStart; i <= shardEnd; i++ {
-		shardStores[shard.ID(i)] = NewStore(pool, def.Name, i)
+		shardStores[shard.ID(i)] = NewStore(pool, def.Name, i, r.queryTimeout)
 	}
 }
 

@@ -105,21 +105,25 @@ func main() {
 	for _, b := range shardCfg.Backends {
 		pool := pools[b.Name]
 		for i := b.ShardStart; i <= b.ShardEnd; i++ {
-			s := storage.NewPostgresStore(pool, i)
+			s := storage.NewPostgresStore(pool, i, cfg.DBQueryTimeout)
 			router.Register(shard.ID(i), s)
 		}
 	}
 
 	// Initialize index registry
 	indexRegistry := index.NewRegistry()
+	indexRegistry.SetQueryTimeout(cfg.DBQueryTimeout)
 
 	if cfg.IndexConfigPath != "" {
+		logger.Info("loading index config", "path", cfg.IndexConfigPath)
 		idxCfg, err := config.LoadIndexConfig(cfg.IndexConfigPath)
 		if err != nil {
 			logger.Error("failed to load index config", "error", err)
 			os.Exit(1)
 		}
+		logger.Info("index config loaded", "indexCount", len(idxCfg.Indexes))
 
+		logger.Info("registering indexes")
 		// Register all definitions across all backends
 		for _, b := range shardCfg.Backends {
 			pool := pools[b.Name]
@@ -136,6 +140,7 @@ func main() {
 
 		// Create index tables per backend
 		for _, b := range shardCfg.Backends {
+			logger.Info("creating index tables", "backend", b.Name, "shards", []int{b.ShardStart, b.ShardEnd})
 			pool := pools[b.Name]
 			if err := indexRegistry.CreateTablesRange(ctx, pool, b.ShardStart, b.ShardEnd); err != nil {
 				logger.Error("failed to create index tables", "backend", b.Name, "error", err)

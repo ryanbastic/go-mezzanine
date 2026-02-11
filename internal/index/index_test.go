@@ -134,7 +134,7 @@ func TestRegistry_MultipleIndexes(t *testing.T) {
 }
 
 func TestNewStore(t *testing.T) {
-	s := NewStore(nil, "test_index", 5)
+	s := NewStore(nil, "test_index", 5, 0)
 	if s == nil {
 		t.Fatal("NewStore returned nil")
 	}

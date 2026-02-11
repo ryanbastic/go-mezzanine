@@ -14,19 +14,34 @@ import (
 
 // PostgresStore implements CellStore for a single shard using PostgreSQL.
 type PostgresStore struct {
-	pool  *pgxpool.Pool
-	table string
+	pool         *pgxpool.Pool
+	table        string
+	queryTimeout time.Duration
 }
 
 // NewPostgresStore creates a CellStore backed by a specific shard table.
-func NewPostgresStore(pool *pgxpool.Pool, shardID int) *PostgresStore {
+// queryTimeout sets the per-query context deadline; zero means no timeout.
+func NewPostgresStore(pool *pgxpool.Pool, shardID int, queryTimeout time.Duration) *PostgresStore {
 	return &PostgresStore{
-		pool:  pool,
-		table: ShardTable(shardID),
+		pool:         pool,
+		table:        ShardTable(shardID),
+		queryTimeout: queryTimeout,
 	}
 }
 
+// withTimeout derives a child context with the configured query timeout.
+// If queryTimeout is zero, the parent context is returned unchanged.
+func (s *PostgresStore) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if s.queryTimeout > 0 {
+		return context.WithTimeout(ctx, s.queryTimeout)
+	}
+	return ctx, func() {}
+}
+
 func (s *PostgresStore) WriteCell(ctx context.Context, req cell.WriteCellRequest) (*cell.Cell, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
 	query := fmt.Sprintf(`
 		INSERT INTO %s (row_key, column_name, ref_key, body)
 		VALUES ($1, $2, $3, $4)
@@ -44,6 +59,9 @@ func (s *PostgresStore) WriteCell(ctx context.Context, req cell.WriteCellRequest
 }
 
 func (s *PostgresStore) GetCell(ctx context.Context, ref cell.CellRef) (*cell.Cell, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
 	query := fmt.Sprintf(`
 		SELECT added_id, row_key, column_name, ref_key, body, created_at
 		FROM %s
@@ -63,6 +81,9 @@ func (s *PostgresStore) GetCell(ctx context.Context, ref cell.CellRef) (*cell.Ce
 }
 
 func (s *PostgresStore) GetCellLatest(ctx context.Context, rowKey uuid.UUID, columnName string) (*cell.Cell, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
 	query := fmt.Sprintf(`
 		SELECT added_id, row_key, column_name, ref_key, body, created_at
 		FROM %s
@@ -84,6 +105,9 @@ func (s *PostgresStore) GetCellLatest(ctx context.Context, rowKey uuid.UUID, col
 }
 
 func (s *PostgresStore) GetRow(ctx context.Context, rowKey uuid.UUID) ([]cell.Cell, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
 	query := fmt.Sprintf(`
 		SELECT DISTINCT ON (column_name)
 			added_id, row_key, column_name, ref_key, body, created_at
@@ -110,6 +134,9 @@ func (s *PostgresStore) GetRow(ctx context.Context, rowKey uuid.UUID) ([]cell.Ce
 }
 
 func (s *PostgresStore) ScanCells(ctx context.Context, columnName string, afterAddedID int64, limit int) ([]cell.Cell, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
 	query := fmt.Sprintf(`
 		SELECT added_id, row_key, column_name, ref_key, body, created_at
 		FROM %s
@@ -144,6 +171,9 @@ const (
 )
 
 func (s *PostgresStore) PartitionRead(ctx context.Context, partitionNumber int, readType int, addedID int64, createdAfter time.Time, limit int) ([]cell.Cell, error) {
+	ctx, cancel := s.withTimeout(ctx)
+	defer cancel()
+
 	var query string
 
 	var rows pgx.Rows

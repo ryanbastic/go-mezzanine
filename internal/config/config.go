@@ -20,11 +20,12 @@ type Config struct {
 	HTTPIdleTimeout  time.Duration
 
 	// Database connection pool
-	DBMaxConns         int
-	DBMinConns         int
-	DBMaxConnLifetime  time.Duration
-	DBMaxConnIdleTime  time.Duration
+	DBMaxConns          int
+	DBMinConns          int
+	DBMaxConnLifetime   time.Duration
+	DBMaxConnIdleTime   time.Duration
 	DBHealthCheckPeriod time.Duration
+	DBQueryTimeout      time.Duration
 
 	// Trigger framework
 	TriggerRetryMax     int
@@ -50,6 +51,7 @@ func Load() Config {
 		DBMaxConnLifetime:   getEnvDuration("DB_MAX_CONN_LIFETIME", 30*time.Minute),
 		DBMaxConnIdleTime:   getEnvDuration("DB_MAX_CONN_IDLE_TIME", 5*time.Minute),
 		DBHealthCheckPeriod: getEnvDuration("DB_HEALTH_CHECK_PERIOD", 30*time.Second),
+		DBQueryTimeout:      getEnvDuration("DB_QUERY_TIMEOUT", 5*time.Second),
 
 		TriggerRetryMax:     getEnvInt("TRIGGER_RETRY_MAX", 3),
 		TriggerRetryBackoff: getEnvDuration("TRIGGER_RETRY_BACKOFF", 100*time.Millisecond),

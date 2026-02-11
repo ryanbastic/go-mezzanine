@@ -16,7 +16,7 @@ func TestLoad_Defaults(t *testing.T) {
 		"PORT", "NUM_SHARDS", "LOG_LEVEL",
 		"HTTP_READ_TIMEOUT", "HTTP_WRITE_TIMEOUT", "HTTP_IDLE_TIMEOUT",
 		"DB_MAX_CONNS", "DB_MIN_CONNS", "DB_MAX_CONN_LIFETIME",
-		"DB_MAX_CONN_IDLE_TIME", "DB_HEALTH_CHECK_PERIOD",
+		"DB_MAX_CONN_IDLE_TIME", "DB_HEALTH_CHECK_PERIOD", "DB_QUERY_TIMEOUT",
 	} {
 		os.Unsetenv(k)
 	}
@@ -65,6 +65,9 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.DBHealthCheckPeriod != 30*time.Second {
 		t.Errorf("DBHealthCheckPeriod: got %v, want %v", cfg.DBHealthCheckPeriod, 30*time.Second)
 	}
+	if cfg.DBQueryTimeout != 5*time.Second {
+		t.Errorf("DBQueryTimeout: got %v, want %v", cfg.DBQueryTimeout, 5*time.Second)
+	}
 }
 
 func TestLoad_CustomValues(t *testing.T) {
@@ -82,6 +85,7 @@ func TestLoad_CustomValues(t *testing.T) {
 		"DB_MAX_CONN_LIFETIME":  "1h",
 		"DB_MAX_CONN_IDLE_TIME": "10m",
 		"DB_HEALTH_CHECK_PERIOD": "1m",
+		"DB_QUERY_TIMEOUT":       "3s",
 	}
 	for k, v := range envs {
 		os.Setenv(k, v)
@@ -132,6 +136,9 @@ func TestLoad_CustomValues(t *testing.T) {
 	}
 	if cfg.DBHealthCheckPeriod != time.Minute {
 		t.Errorf("DBHealthCheckPeriod: got %v", cfg.DBHealthCheckPeriod)
+	}
+	if cfg.DBQueryTimeout != 3*time.Second {
+		t.Errorf("DBQueryTimeout: got %v", cfg.DBQueryTimeout)
 	}
 }
 
