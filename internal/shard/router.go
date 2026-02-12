@@ -20,8 +20,8 @@ func NewRouter() *Router {
 // Register associates a shard ID with a CellStore.
 func (r *Router) Register(id ID, store storage.CellStore) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.stores[id] = store
+	r.mu.Unlock()
 }
 
 // StoreFor returns the CellStore for the given shard ID.
