@@ -152,8 +152,21 @@ func main() {
 		logger.Info("indexes registered", "count", len(idxCfg.Indexes))
 	}
 
-	// Initialize trigger plugin system
-	pluginRegistry := trigger.NewPluginRegistry()
+	// Initialize trigger plugin system with persistent storage.
+	// Use the first backend's pool for the shared plugins table.
+	firstBackend := shardCfg.Backends[0]
+	pluginPool := pools[firstBackend.Name]
+	if err := storage.RunPluginMigration(ctx, pluginPool); err != nil {
+		logger.Error("failed to run plugin migration", "error", err)
+		os.Exit(1)
+	}
+	pluginStore := trigger.NewPostgresPluginStore(pluginPool, cfg.DBQueryTimeout)
+	pluginRegistry := trigger.NewPluginRegistry(pluginStore)
+	if err := pluginRegistry.LoadAll(ctx); err != nil {
+		logger.Error("failed to load plugins from store", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("plugin registry loaded", "count", len(pluginRegistry.List()))
 	rpcClient := trigger.NewRPCClient(cfg.TriggerRetryMax, cfg.TriggerRetryBackoff, cfg.TriggerRPCTimeout)
 	notifier := trigger.NewNotifier(pluginRegistry, rpcClient, logger)
 

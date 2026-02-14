@@ -1,6 +1,7 @@
 package trigger
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"sync"
@@ -28,14 +29,39 @@ type Plugin struct {
 }
 
 // PluginRegistry is a thread-safe in-memory store of registered plugins.
+// When a PluginStore is provided, mutations are persisted to durable storage.
 type PluginRegistry struct {
 	mu      sync.RWMutex
 	plugins map[uuid.UUID]*Plugin
+	store   PluginStore // optional; nil means in-memory only
 }
 
 // NewPluginRegistry creates an empty registry.
-func NewPluginRegistry() *PluginRegistry {
-	return &PluginRegistry{plugins: make(map[uuid.UUID]*Plugin)}
+// An optional PluginStore enables write-through persistence.
+func NewPluginRegistry(store ...PluginStore) *PluginRegistry {
+	r := &PluginRegistry{plugins: make(map[uuid.UUID]*Plugin)}
+	if len(store) > 0 && store[0] != nil {
+		r.store = store[0]
+	}
+	return r
+}
+
+// LoadAll populates the in-memory registry from the backing store.
+// It is a no-op if no store is configured.
+func (r *PluginRegistry) LoadAll(ctx context.Context) error {
+	if r.store == nil {
+		return nil
+	}
+	plugins, err := r.store.ListPlugins(ctx)
+	if err != nil {
+		return fmt.Errorf("load plugins: %w", err)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, p := range plugins {
+		r.plugins[p.ID] = p
+	}
+	return nil
 }
 
 // Register adds a plugin to the registry. It assigns an ID and creation timestamp.
@@ -52,6 +78,11 @@ func (r *PluginRegistry) Register(p *Plugin) error {
 	p.CreatedAt = time.Now()
 	if p.Status == "" {
 		p.Status = PluginStatusActive
+	}
+	if r.store != nil {
+		if err := r.store.SavePlugin(context.Background(), p); err != nil {
+			return fmt.Errorf("persist plugin: %w", err)
+		}
 	}
 	r.plugins[p.ID] = p
 	return nil
@@ -85,6 +116,11 @@ func (r *PluginRegistry) Delete(id uuid.UUID) error {
 	defer r.mu.Unlock()
 	if _, ok := r.plugins[id]; !ok {
 		return fmt.Errorf("plugin %s not found", id)
+	}
+	if r.store != nil {
+		if err := r.store.DeletePlugin(context.Background(), id); err != nil {
+			return fmt.Errorf("persist delete: %w", err)
+		}
 	}
 	delete(r.plugins, id)
 	return nil

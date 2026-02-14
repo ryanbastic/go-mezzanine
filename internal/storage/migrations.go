@@ -38,6 +38,24 @@ func RunMigrationsForPool(ctx context.Context, pool *pgxpool.Pool, shardStart, s
 	return nil
 }
 
+// RunPluginMigration creates the plugins table for persistent trigger plugin storage.
+func RunPluginMigration(ctx context.Context, pool *pgxpool.Pool) error {
+	ddl := `
+		CREATE TABLE IF NOT EXISTS plugins (
+			id                UUID PRIMARY KEY,
+			name              TEXT UNIQUE NOT NULL,
+			endpoint          TEXT NOT NULL,
+			subscribed_columns TEXT[] NOT NULL,
+			status            TEXT NOT NULL DEFAULT 'active',
+			created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+	`
+	if _, err := pool.Exec(ctx, ddl); err != nil {
+		return fmt.Errorf("migrate plugins table: %w", err)
+	}
+	return nil
+}
+
 // ShardTable returns the table name for a given shard number.
 func ShardTable(shardID int) string {
 	return fmt.Sprintf("cells_%04d", shardID)

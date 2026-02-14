@@ -26,10 +26,10 @@
   COPY --from=build /mezzanine /mezzanine
   ENTRYPOINT ["/mezzanine"]
 
-  5. Persistent Plugin Registry
+  5. ~~Persistent Plugin Registry~~ ✅ Done
 
-  The trigger plugin registry is in-memory — plugins vanish on restart. Back it with a Postgres table so registrations
-  survive restarts.
+  The plugin registry is now backed by a PostgreSQL `plugins` table. Registrations are persisted on write and loaded
+  from the database on startup.
 
   ---
   Medium Priority (operational maturity)
