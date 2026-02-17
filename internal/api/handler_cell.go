@@ -75,16 +75,19 @@ type GetRowOutput struct {
 	Body RowResponse
 }
 
+// PartitionReadInput now supports cursor-based pagination
 type PartitionReadInput struct {
 	PartitionNumber   int       `query:"partition_number" doc:"Partition number" required:"true"`
-	PartitionReadType int       `query:"read_type" doc:"Read type" required:"true"`
-	CreatedAfter      time.Time `query:"created_after" doc:"Filter cells created after this timestamp" required:"false"`
-	AddedID           int64     `query:"added_id" doc:"Filter cells added after ID" required:"false"`
-	Limit             int       `query:"limit" doc:"Maximum number of cells to return" required:"false"`
+	PartitionReadType int       `query:"read_type" doc:"Read type (1=created_at, 2=added_id)" required:"true"`
+	Cursor            string    `query:"cursor" doc:"Opaque pagination cursor from previous response" required:"false"`
+	Limit             int       `query:"limit" doc:"Maximum number of cells to return (default 1000, max 10000)" required:"false"`
 }
 
+// PartitionReadOutput includes pagination metadata
 type PartitionReadOutput struct {
-	Body []CellResponse
+	Cells      []CellResponse `json:"cells" doc:"Cells in this page"`
+	NextCursor string         `json:"next_cursor,omitempty" doc:"Cursor for next page (empty if no more results)"`
+	HasMore    bool           `json:"has_more" doc:"True if more results available"`
 }
 
 // --- Handler ---
@@ -139,7 +142,7 @@ func registerCellRoutes(api huma.API, h *CellHandler) {
 		OperationID: "partition-read",
 		Method:      http.MethodGet,
 		Path:        "/v1/cells/partitionRead",
-		Summary:     "Read a partition of cells",
+		Summary:     "Read a partition of cells with pagination",
 		Tags:        []string{"cells"},
 	}, h.PartitionRead)
 }
@@ -276,24 +279,37 @@ func (h *CellHandler) PartitionRead(ctx context.Context, input *PartitionReadInp
 		return nil, huma.Error400BadRequest("invalid partition number")
 	}
 
+	// Validate and cap limit
+	limit := input.Limit
+	if limit <= 0 {
+		limit = 1000 // default
+	}
+	if limit > 10000 {
+		limit = 10000 // max
+	}
+
 	store, err := h.router.StoreFor(shard.ID(input.PartitionNumber))
 	if err != nil {
 		h.logger.Error("shard routing failed", "partition_number", input.PartitionNumber, "error", err)
 		return nil, huma.Error500InternalServerError("shard routing failed")
 	}
 
-	cells, err := store.PartitionRead(ctx, input.PartitionNumber, input.PartitionReadType, input.AddedID, input.CreatedAfter, input.Limit)
+	page, err := store.PartitionRead(ctx, input.PartitionNumber, input.PartitionReadType, input.Cursor, limit)
 	if err != nil {
 		h.logger.Error("failed to read partition", "partition_number", input.PartitionNumber, "error", err)
 		return nil, huma.Error500InternalServerError("failed to read partition")
 	}
 
-	resp := make([]CellResponse, len(cells))
-	for i, c := range cells {
+	resp := make([]CellResponse, len(page.Cells))
+	for i, c := range page.Cells {
 		resp[i] = cellToResponse(&c)
 	}
 
-	return &PartitionReadOutput{Body: resp}, nil
+	return &PartitionReadOutput{
+		Cells:      resp,
+		NextCursor: page.NextCursor,
+		HasMore:    page.HasMore,
+	}, nil
 }
 
 func cellToResponse(c *cell.Cell) CellResponse {

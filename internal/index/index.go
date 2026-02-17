@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ryanbastic/go-mezzanine/internal/cell"
 	"github.com/ryanbastic/go-mezzanine/internal/shard"
+	"github.com/ryanbastic/go-mezzanine/internal/storage"
 )
 
 // Entry is a single row in a secondary index table.
@@ -20,6 +21,13 @@ type Entry struct {
 	RowKey    uuid.UUID       `json:"row_key"`
 	Body      json.RawMessage `json:"body"`
 	CreatedAt time.Time       `json:"created_at"`
+}
+
+// EntryPage represents a paginated result set of index entries.
+type EntryPage struct {
+	Entries    []Entry
+	NextCursor string
+	HasMore    bool
 }
 
 // Definition describes a secondary index.
@@ -33,7 +41,11 @@ type Definition struct {
 
 // IndexStore is the interface for index read/write operations on a single shard.
 type IndexStore interface {
-	QueryByShardKey(ctx context.Context, shardKey string) ([]Entry, error)
+	// QueryByShardKey returns index entries for a given shard key with pagination.
+	// If cursor is non-empty, reading starts after the cursor position.
+	// Returns an EntryPage containing entries and a cursor for the next page.
+	QueryByShardKey(ctx context.Context, shardKey string, cursor string, limit int) (*EntryPage, error)
+
 	WriteEntry(ctx context.Context, entry Entry) error
 }
 
@@ -85,33 +97,73 @@ func (s *Store) WriteEntry(ctx context.Context, entry Entry) error {
 	return nil
 }
 
-// QueryByShardKey returns all index entries for a given shard key.
-func (s *Store) QueryByShardKey(ctx context.Context, shardKey string) ([]Entry, error) {
+// QueryByShardKey returns all index entries for a given shard key with pagination.
+func (s *Store) QueryByShardKey(ctx context.Context, shardKey string, cursor string, limit int) (*EntryPage, error) {
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
+
+	// Default limit if not specified or negative
+	if limit <= 0 {
+		limit = 100
+	}
+
+	// Decode cursor if provided
+	var afterAddedID int64
+	if cursor != "" {
+		c, err := storage.DecodeCursor(cursor)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cursor: %w", err)
+		}
+		afterAddedID = c.AddedID
+	}
 
 	query := fmt.Sprintf(`
 		SELECT added_id, shard_key, row_key, body, created_at
 		FROM %s
-		WHERE shard_key = $1
+		WHERE shard_key = $1 AND added_id > $2
 		ORDER BY added_id ASC
+		LIMIT $3
 	`, s.table)
 
-	rows, err := s.pool.Query(ctx, query, shardKey)
+	rows, err := s.pool.Query(ctx, query, shardKey, afterAddedID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query index: %w", err)
 	}
 	defer rows.Close()
 
 	var entries []Entry
+	var lastAddedID int64
+
 	for rows.Next() {
 		var e Entry
 		if err := rows.Scan(&e.AddedID, &e.ShardKey, &e.RowKey, &e.Body, &e.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan index entry: %w", err)
 		}
 		entries = append(entries, e)
+		lastAddedID = e.AddedID
 	}
-	return entries, rows.Err()
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("index rows: %w", err)
+	}
+
+	page := &EntryPage{
+		Entries: entries,
+		HasMore: false,
+	}
+
+	// Generate next cursor if we got a full page
+	if len(entries) == limit {
+		nextCursor := &storage.Cursor{AddedID: lastAddedID}
+		encoded, err := nextCursor.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("encode next cursor: %w", err)
+		}
+		page.NextCursor = encoded
+		page.HasMore = true
+	}
+
+	return page, nil
 }
 
 // Registry holds all index definitions and their per-shard stores.
@@ -269,25 +321,25 @@ func (r *Registry) RegisterRange(pool *pgxpool.Pool, def Definition, shardStart,
 func buildTableDDL(table string, uniqueFields []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, `
-				CREATE TABLE IF NOT EXISTS %s (
-					added_id   BIGSERIAL PRIMARY KEY,
-					shard_key  TEXT NOT NULL,
-					row_key    UUID NOT NULL,
-					body       JSONB NOT NULL,
-					created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-				);
+			CREATE TABLE IF NOT EXISTS %s (
+				added_id   BIGSERIAL PRIMARY KEY,
+				shard_key  TEXT NOT NULL,
+				row_key    UUID NOT NULL,
+				body       JSONB NOT NULL,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			);
 
-				ALTER TABLE %s ALTER COLUMN shard_key TYPE TEXT USING shard_key::text;
+			ALTER TABLE %s ALTER COLUMN shard_key TYPE TEXT USING shard_key::text;
 
-				CREATE INDEX IF NOT EXISTS idx_%s_shard_key
-					ON %s (shard_key);
-			`, table, table, table, table)
+			CREATE INDEX IF NOT EXISTS idx_%s_shard_key
+				ON %s (shard_key);
+		`, table, table, table, table)
 
 	for _, uf := range uniqueFields {
 		fmt.Fprintf(&b, `
-				CREATE UNIQUE INDEX IF NOT EXISTS idx_%s_%s
-					ON %s ((body->>'%s'));
-			`, table, uf, table, uf)
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_%s_%s
+				ON %s ((body->>'%s'));
+		`, table, uf, table, uf)
 	}
 	return b.String()
 }

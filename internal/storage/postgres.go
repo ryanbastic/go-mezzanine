@@ -170,17 +170,40 @@ const (
 	PartitionReadTypeAddedID   = 2
 )
 
-func (s *PostgresStore) PartitionRead(ctx context.Context, partitionNumber int, readType int, addedID int64, createdAfter time.Time, limit int) ([]cell.Cell, error) {
+func (s *PostgresStore) PartitionRead(ctx context.Context, partitionNumber int, readType int, cursor string, limit int) (*Page, error) {
 	ctx, cancel := s.withTimeout(ctx)
 	defer cancel()
 
-	var query string
+	// Default limit if not specified or negative
+	if limit <= 0 {
+		limit = 1000
+	}
 
+	// Decode cursor if provided
+	var cursorVal *Cursor
+	if cursor != "" {
+		var err error
+		cursorVal, err = DecodeCursor(cursor)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cursor: %w", err)
+		}
+	}
+
+	var query string
 	var rows pgx.Rows
 	var err error
+
 	switch readType {
 	case PartitionReadTypeCreatedAt:
-		// TODO FIXME $1::timestamp ?
+		var createdAfter time.Time
+		if cursorVal != nil && cursorVal.CreatedAt != "" {
+			var parseErr error
+			createdAfter, parseErr = time.Parse(time.RFC3339, cursorVal.CreatedAt)
+			if parseErr != nil {
+				return nil, fmt.Errorf("invalid created_at cursor: %w", parseErr)
+			}
+		}
+
 		query = fmt.Sprintf(`
 			SELECT added_id, row_key, column_name, ref_key, body, created_at
 			FROM %s
@@ -189,9 +212,14 @@ func (s *PostgresStore) PartitionRead(ctx context.Context, partitionNumber int, 
 			LIMIT $2
 		`, s.table)
 
-		rows, err = s.pool.Query(ctx, query, partitionNumber, createdAfter, limit)
+		rows, err = s.pool.Query(ctx, query, createdAfter, limit)
 
 	case PartitionReadTypeAddedID:
+		var afterAddedID int64
+		if cursorVal != nil {
+			afterAddedID = cursorVal.AddedID
+		}
+
 		query = fmt.Sprintf(`
 			SELECT added_id, row_key, column_name, ref_key, body, created_at
 			FROM %s
@@ -200,7 +228,8 @@ func (s *PostgresStore) PartitionRead(ctx context.Context, partitionNumber int, 
 			LIMIT $2
 		`, s.table)
 
-		rows, err = s.pool.Query(ctx, query, addedID, limit)
+		rows, err = s.pool.Query(ctx, query, afterAddedID, limit)
+
 	default:
 		return nil, fmt.Errorf("invalid read type: %d", readType)
 	}
@@ -211,12 +240,45 @@ func (s *PostgresStore) PartitionRead(ctx context.Context, partitionNumber int, 
 	defer rows.Close()
 
 	var cells []cell.Cell
+	var lastAddedID int64
+	var lastCreatedAt time.Time
+
 	for rows.Next() {
 		var c cell.Cell
 		if err := rows.Scan(&c.AddedID, &c.RowKey, &c.ColumnName, &c.RefKey, &c.Body, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("partition read scan: %w", err)
 		}
 		cells = append(cells, c)
+		lastAddedID = c.AddedID
+		lastCreatedAt = c.CreatedAt
 	}
-	return cells, rows.Err()
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("partition read rows: %w", err)
+	}
+
+	page := &Page{
+		Cells:   cells,
+		HasMore: false,
+	}
+
+	// Generate next cursor if we got a full page (might have more)
+	if len(cells) == limit {
+		var nextCursor Cursor
+		switch readType {
+		case PartitionReadTypeCreatedAt:
+			nextCursor.CreatedAt = lastCreatedAt.Format(time.RFC3339Nano)
+		case PartitionReadTypeAddedID:
+			nextCursor.AddedID = lastAddedID
+		}
+
+		encoded, err := nextCursor.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("encode next cursor: %w", err)
+		}
+		page.NextCursor = encoded
+		page.HasMore = true
+	}
+
+	return page, nil
 }

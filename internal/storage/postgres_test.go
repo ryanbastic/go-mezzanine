@@ -352,20 +352,24 @@ func TestPartitionRead_ByAddedID(t *testing.T) {
 		addedIDs = append(addedIDs, c.AddedID)
 	}
 
-	cells, err := store.PartitionRead(ctx, 0, PartitionReadTypeAddedID, 0, time.Time{}, 100)
+	page, err := store.PartitionRead(ctx, 0, PartitionReadTypeAddedID, "", 100)
 	if err != nil {
 		t.Fatalf("PartitionRead: %v", err)
 	}
-	if len(cells) != 3 {
-		t.Fatalf("len(cells) = %d, want 3", len(cells))
+	if len(page.Cells) != 3 {
+		t.Fatalf("len(page.Cells) = %d, want 3", len(page.Cells))
 	}
 
-	cells2, err := store.PartitionRead(ctx, 0, PartitionReadTypeAddedID, addedIDs[0], time.Time{}, 100)
+	// Create cursor for next page
+	cursor := &Cursor{AddedID: addedIDs[0]}
+	cursorStr, _ := cursor.Encode()
+	
+	page2, err := store.PartitionRead(ctx, 0, PartitionReadTypeAddedID, cursorStr, 100)
 	if err != nil {
 		t.Fatalf("PartitionRead after: %v", err)
 	}
-	if len(cells2) != 2 {
-		t.Errorf("len(cells2) = %d, want 2", len(cells2))
+	if len(page2.Cells) != 2 {
+		t.Errorf("len(page2.Cells) = %d, want 2", len(page2.Cells))
 	}
 }
 
@@ -373,7 +377,7 @@ func TestPartitionRead_InvalidType(t *testing.T) {
 	store := freshShard(t)
 	ctx := context.Background()
 
-	_, err := store.PartitionRead(ctx, 0, 999, 0, time.Time{}, 10)
+	_, err := store.PartitionRead(ctx, 0, 999, "", 10)
 	if err == nil {
 		t.Fatal("expected error for invalid read type")
 	}

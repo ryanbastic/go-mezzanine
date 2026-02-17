@@ -15,9 +15,12 @@ import (
 
 // --- Huma Input/Output types ---
 
+// QueryIndexInput now supports pagination
 type QueryIndexInput struct {
 	IndexName string `path:"index_name" doc:"Secondary index name"`
 	Value     string `path:"value" doc:"Lookup value (e.g. email address)" minLength:"1"`
+	Limit     int    `query:"limit" doc:"Maximum number of entries to return (default 100, max 1000)" required:"false"`
+	Cursor    string `query:"cursor" doc:"Opaque pagination cursor from previous response" required:"false"`
 }
 
 type IndexEntryResponse struct {
@@ -28,8 +31,11 @@ type IndexEntryResponse struct {
 	CreatedAt time.Time       `json:"created_at" doc:"Creation timestamp"`
 }
 
+// QueryIndexOutput includes pagination metadata
 type QueryIndexOutput struct {
-	Body []IndexEntryResponse
+	Entries    []IndexEntryResponse `json:"entries" doc:"Index entries in this page"`
+	NextCursor string               `json:"next_cursor,omitempty" doc:"Cursor for next page (empty if no more results)"`
+	HasMore    bool                 `json:"has_more" doc:"True if more results available"`
 }
 
 // --- Handler ---
@@ -49,26 +55,35 @@ func registerIndexRoutes(api huma.API, h *IndexHandler) {
 		OperationID: "query-index",
 		Method:      http.MethodGet,
 		Path:        "/v1/index/{index_name}/{value}",
-		Summary:     "Query secondary index",
+		Summary:     "Query secondary index with pagination",
 		Tags:        []string{"index"},
 	}, h.QueryIndex)
 }
 
 func (h *IndexHandler) QueryIndex(ctx context.Context, input *QueryIndexInput) (*QueryIndexOutput, error) {
+	// Validate and cap limit
+	limit := input.Limit
+	if limit <= 0 {
+		limit = 100 // default
+	}
+	if limit > 1000 {
+		limit = 1000 // max
+	}
+
 	shardID := shard.ForKey(input.Value, h.numShards)
 	store, ok := h.registry.StoreFor(input.IndexName, shardID)
 	if !ok {
 		return nil, huma.Error404NotFound("index not found")
 	}
 
-	entries, err := store.QueryByShardKey(ctx, input.Value)
+	page, err := store.QueryByShardKey(ctx, input.Value, input.Cursor, limit)
 	if err != nil {
 		h.logger.Error("failed to query index", "index_name", input.IndexName, "value", input.Value, "error", err)
 		return nil, huma.Error500InternalServerError("failed to query index")
 	}
 
-	resp := make([]IndexEntryResponse, len(entries))
-	for i, e := range entries {
+	resp := make([]IndexEntryResponse, len(page.Entries))
+	for i, e := range page.Entries {
 		resp[i] = IndexEntryResponse{
 			AddedID:   e.AddedID,
 			ShardKey:  e.ShardKey,
@@ -78,6 +93,9 @@ func (h *IndexHandler) QueryIndex(ctx context.Context, input *QueryIndexInput) (
 		}
 	}
 
-	return &QueryIndexOutput{Body: resp}, nil
+	return &QueryIndexOutput{
+		Entries:    resp,
+		NextCursor: page.NextCursor,
+		HasMore:    page.HasMore,
+	}, nil
 }
-

@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/ryanbastic/go-mezzanine/internal/cell"
@@ -11,6 +10,13 @@ import (
 
 // ErrCellNotFound is returned when a cell lookup finds no matching row.
 var ErrCellNotFound = errors.New("cell not found")
+
+// Page represents a paginated result set with a cursor for the next page.
+type Page struct {
+	Cells      []cell.Cell
+	NextCursor string // Empty if no more pages
+	HasMore    bool
+}
 
 // CellStore is the primary storage interface for a single shard.
 type CellStore interface {
@@ -26,8 +32,11 @@ type CellStore interface {
 	// GetRow returns the latest cell for every column_name in a row.
 	GetRow(ctx context.Context, rowKey uuid.UUID) ([]cell.Cell, error)
 
-	// PartitionRead reads a partition of cells.
-	PartitionRead(ctx context.Context, partitionNumber int, readType int, addedID int64, createdAfter time.Time, limit int) ([]cell.Cell, error)
+	// PartitionRead reads a partition of cells with optional pagination.
+	// If limit > 0, at most limit cells are returned.
+	// If cursor is non-empty, reading starts after the cursor position.
+	// Returns a Page containing cells and a cursor for the next page (if more exist).
+	PartitionRead(ctx context.Context, partitionNumber int, readType int, cursor string, limit int) (*Page, error)
 
 	// ScanCells returns cells with added_id > afterAddedID for a given column,
 	// ordered by added_id ASC. Used by the trigger framework.
