@@ -52,9 +52,9 @@ func main() {
 					return slog.Attr{
 						Key: a.Key,
 						Value: slog.GroupValue(
-							slog.String("c", src.File),
+							slog.String("f", src.File),
 							slog.Int("l", src.Line),
-							slog.String("f", src.Function),
+							slog.String("c", src.Function),
 						),
 					}
 				}
