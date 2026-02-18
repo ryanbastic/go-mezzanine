@@ -26,9 +26,12 @@ func RunMigrationsForPool(ctx context.Context, pool *pgxpool.Pool, shardStart, s
 			CREATE INDEX IF NOT EXISTS idx_%s_row_col
 				ON %s (row_key, column_name, ref_key DESC);
 
-			CREATE INDEX IF NOT EXISTS idx_%s_trigger
+			CREATE INDEX IF NOT EXISTS idx_%s_trigger_added_at
 				ON %s (column_name, added_id);
-		`, table, table, table, table, table, table)
+
+			CREATE INDEX IF NOT EXISTS idx_%s_trigger_created_at
+				ON %s (column_name, created_at);
+		`, table, table, table, table, table, table, table, table)
 
 		if _, err := pool.Exec(ctx, ddl); err != nil {
 			return fmt.Errorf("migrate shard %d: %w", i, err)

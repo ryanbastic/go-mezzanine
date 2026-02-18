@@ -38,6 +38,7 @@ func main() {
 		logLevel = slog.LevelInfo
 		slog.Warn("invalid log level, defaulting to info", "value", cfg.LogLevel)
 	}
+
 	const modulePrefix = "github.com/ryanbastic/go-mezzanine/"
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     logLevel,
@@ -47,6 +48,14 @@ func main() {
 				if src, ok := a.Value.Any().(*slog.Source); ok {
 					if idx := strings.Index(src.File, modulePrefix); idx != -1 {
 						src.File = src.File[idx+len(modulePrefix):]
+					}
+					return slog.Attr{
+						Key: a.Key,
+						Value: slog.GroupValue(
+							slog.String("c", src.File),
+							slog.Int("l", src.Line),
+							slog.String("f", src.Function),
+						),
 					}
 				}
 			}
@@ -106,6 +115,7 @@ func main() {
 	logger.Info("running migrations")
 	// Run migrations per backend
 	for _, b := range shardCfg.Backends {
+		logger.Info("running migrations for backend", "backend", b.Name, "shards", []int{b.ShardStart, b.ShardEnd})
 		pool := pools[b.Name]
 		if err := storage.RunMigrationsForPool(ctx, pool, b.ShardStart, b.ShardEnd); err != nil {
 			logger.Error("failed to run migrations", "backend", b.Name, "error", err)
