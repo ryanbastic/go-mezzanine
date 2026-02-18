@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -37,7 +38,21 @@ func main() {
 		logLevel = slog.LevelInfo
 		slog.Warn("invalid log level, defaulting to info", "value", cfg.LogLevel)
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
+	const modulePrefix = "github.com/ryanbastic/go-mezzanine/"
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     logLevel,
+		AddSource: true,
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.SourceKey {
+				if src, ok := a.Value.Any().(*slog.Source); ok {
+					if idx := strings.Index(src.File, modulePrefix); idx != -1 {
+						src.File = src.File[idx+len(modulePrefix):]
+					}
+				}
+			}
+			return a
+		},
+	}))
 	slog.SetDefault(logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
