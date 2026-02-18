@@ -13,7 +13,7 @@ The HTTP API is built with [Huma](https://huma.rocks/), which auto-generates an 
                               │
                     ┌─────────▼──────────┐
                     │   Chi Router /v1   │
-                    │  (middleware stack) │
+                    │ (middleware stack) │
                     └─────────┬──────────┘
                               │
                      ┌────────▼────────┐
