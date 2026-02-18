@@ -61,9 +61,9 @@
   ---
   Lower Priority (hardening & polish)
 
-  - Pagination — partition/scan reads return unbounded results; add LIMIT/cursor
+  - Pagination — partition/scan reads return unbounded results; add LIMIT/cursor (Already done)
   - Index consistency — cell writes and index writes are separate operations with no transactional guarantee; consider
-  wrapping in a Postgres transaction
+  wrapping in a Postgres transaction (Not possible, could write to separate shard)
   - Audit logging — record who wrote what and when for compliance
   - Load testing — use k6 or vegeta to find your breaking point before users do
   - Linting/CI — add .golangci.yml and a CI pipeline (GitHub Actions) for automated testing on PRs
