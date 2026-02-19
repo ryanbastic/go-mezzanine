@@ -123,7 +123,7 @@ func registerCellRoutes(api huma.API, h *CellHandler) {
 		OperationID: "get-cell-latest",
 		Method:      http.MethodGet,
 		Path:        "/v1/cells/{row_key}/{column_name}",
-		Summary:     "Get latest cell version",
+		Summary:     "Get latest cell version for a given row key and column name",
 		Tags:        []string{"cells"},
 	}, h.GetCellLatest)
 
@@ -131,7 +131,7 @@ func registerCellRoutes(api huma.API, h *CellHandler) {
 		OperationID: "get-row",
 		Method:      http.MethodGet,
 		Path:        "/v1/cells/{row_key}",
-		Summary:     "Get all latest cells for a row",
+		Summary:     "Get all latest cells for a row key",
 		Tags:        []string{"cells"},
 	}, h.GetRow)
 
