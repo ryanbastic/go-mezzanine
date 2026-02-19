@@ -265,8 +265,10 @@ func (h *CellHandler) PartitionRead(ctx context.Context, input *PartitionReadInp
 	switch input.PartitionReadType {
 	case storage.PartitionReadTypeCreatedAt:
 		// Handle type1 partition read
+		break
 	case storage.PartitionReadTypeAddedID:
 		// Handle type2 partition read
+		break
 	default:
 		return nil, huma.Error400BadRequest("invalid partition type")
 	}

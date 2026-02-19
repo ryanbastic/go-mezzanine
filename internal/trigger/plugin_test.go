@@ -1,6 +1,7 @@
 package trigger
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -13,7 +14,7 @@ func TestPluginRegistry_RegisterAndGet(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile", "settings"},
 	}
-	if err := r.Register(p); err != nil {
+	if err := r.Register(context.Background(), p); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 
@@ -51,7 +52,7 @@ func TestPluginRegistry_RegisterDuplicate(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile"},
 	}
-	if err := r.Register(p); err != nil {
+	if err := r.Register(context.Background(), p); err != nil {
 		t.Fatalf("first Register: %v", err)
 	}
 
@@ -60,7 +61,7 @@ func TestPluginRegistry_RegisterDuplicate(t *testing.T) {
 		Endpoint:          "http://localhost:9001/rpc",
 		SubscribedColumns: []string{"settings"},
 	}
-	if err := r.Register(dup); err == nil {
+	if err := r.Register(context.Background(), dup); err == nil {
 		t.Fatal("expected error for duplicate plugin name")
 	}
 
@@ -71,8 +72,8 @@ func TestPluginRegistry_RegisterDuplicate(t *testing.T) {
 
 func TestPluginRegistry_List(t *testing.T) {
 	r := NewPluginRegistry()
-	r.Register(&Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"x"}})  //nolint:errcheck
-	r.Register(&Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"y"}})  //nolint:errcheck
+	r.Register(context.Background(), &Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"x"}}) //nolint:errcheck
+	r.Register(context.Background(), &Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"y"}}) //nolint:errcheck
 
 	list := r.List()
 	if len(list) != 2 {
@@ -83,7 +84,7 @@ func TestPluginRegistry_List(t *testing.T) {
 func TestPluginRegistry_Delete(t *testing.T) {
 	r := NewPluginRegistry()
 	p := &Plugin{Name: "del", Endpoint: "http://del/rpc", SubscribedColumns: []string{"x"}}
-	if err := r.Register(p); err != nil {
+	if err := r.Register(context.Background(), p); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 
@@ -104,9 +105,9 @@ func TestPluginRegistry_DeleteNotFound(t *testing.T) {
 
 func TestPluginRegistry_ForColumn(t *testing.T) {
 	r := NewPluginRegistry()
-	r.Register(&Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"profile", "settings"}})  //nolint:errcheck
-	r.Register(&Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"profile"}})              //nolint:errcheck
-	r.Register(&Plugin{Name: "c", Endpoint: "http://c/rpc", SubscribedColumns: []string{"orders"}, Status: PluginStatusInactive}) //nolint:errcheck
+	r.Register(context.Background(), &Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"profile", "settings"}})                  //nolint:errcheck
+	r.Register(context.Background(), &Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"profile"}})                              //nolint:errcheck
+	r.Register(context.Background(), &Plugin{Name: "c", Endpoint: "http://c/rpc", SubscribedColumns: []string{"orders"}, Status: PluginStatusInactive}) //nolint:errcheck
 
 	got := r.ForColumn("profile")
 	if len(got) != 2 {
@@ -126,9 +127,9 @@ func TestPluginRegistry_ForColumn(t *testing.T) {
 
 func TestPluginRegistry_Columns(t *testing.T) {
 	r := NewPluginRegistry()
-	r.Register(&Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"profile", "settings"}})                    //nolint:errcheck
-	r.Register(&Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"profile", "orders"}})                    //nolint:errcheck
-	r.Register(&Plugin{Name: "c", Endpoint: "http://c/rpc", SubscribedColumns: []string{"hidden"}, Status: PluginStatusInactive}) //nolint:errcheck
+	r.Register(context.Background(), &Plugin{Name: "a", Endpoint: "http://a/rpc", SubscribedColumns: []string{"profile", "settings"}})                  //nolint:errcheck
+	r.Register(context.Background(), &Plugin{Name: "b", Endpoint: "http://b/rpc", SubscribedColumns: []string{"profile", "orders"}})                    //nolint:errcheck
+	r.Register(context.Background(), &Plugin{Name: "c", Endpoint: "http://c/rpc", SubscribedColumns: []string{"hidden"}, Status: PluginStatusInactive}) //nolint:errcheck
 
 	cols := r.Columns()
 	colSet := make(map[string]bool)

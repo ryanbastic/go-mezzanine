@@ -107,7 +107,7 @@ func (h *PluginHandler) RegisterPlugin(ctx context.Context, input *RegisterPlugi
 		Endpoint:          input.Body.Endpoint,
 		SubscribedColumns: input.Body.SubscribedColumns,
 	}
-	if err := h.registry.Register(p); err != nil {
+	if err := h.registry.Register(ctx, p); err != nil {
 		return nil, huma.Error409Conflict(err.Error())
 	}
 

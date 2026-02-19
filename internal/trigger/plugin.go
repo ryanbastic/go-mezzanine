@@ -66,7 +66,7 @@ func (r *PluginRegistry) LoadAll(ctx context.Context) error {
 
 // Register adds a plugin to the registry. It assigns an ID and creation timestamp.
 // It returns an error if a plugin with the same name is already registered.
-func (r *PluginRegistry) Register(p *Plugin) error {
+func (r *PluginRegistry) Register(ctx context.Context, p *Plugin) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, existing := range r.plugins {
@@ -80,7 +80,7 @@ func (r *PluginRegistry) Register(p *Plugin) error {
 		p.Status = PluginStatusActive
 	}
 	if r.store != nil {
-		if err := r.store.SavePlugin(context.Background(), p); err != nil {
+		if err := r.store.SavePlugin(ctx, p); err != nil {
 			return fmt.Errorf("persist plugin: %w", err)
 		}
 	}

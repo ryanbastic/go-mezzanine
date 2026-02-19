@@ -55,7 +55,7 @@ func TestPluginRegistry_WithStore_RegisterPersists(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile"},
 	}
-	if err := r.Register(p); err != nil {
+	if err := r.Register(context.Background(), p); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 
@@ -81,7 +81,7 @@ func TestPluginRegistry_WithStore_DeleteRemovesFromStore(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile"},
 	}
-	if err := r.Register(p); err != nil {
+	if err := r.Register(context.Background(), p); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 
@@ -151,7 +151,7 @@ func TestPluginRegistry_WithNilStore(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile"},
 	}
-	if err := r.Register(p); err != nil {
+	if err := r.Register(context.Background(), p); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 

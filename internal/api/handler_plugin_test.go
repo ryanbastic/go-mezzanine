@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -194,7 +195,7 @@ func TestGetPlugin_Success(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile"},
 	}
-	if err := registry.Register(p); err != nil {
+	if err := registry.Register(context.Background(), p); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 
@@ -248,7 +249,7 @@ func TestDeletePlugin_Success(t *testing.T) {
 		Endpoint:          "http://localhost:9000/rpc",
 		SubscribedColumns: []string{"profile"},
 	}
-	if err := registry.Register(p); err != nil {
+	if err := registry.Register(context.Background(), p); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 

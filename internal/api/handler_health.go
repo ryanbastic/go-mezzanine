@@ -31,15 +31,18 @@ type backendStatus struct {
 }
 
 type readyzResponse struct {
-	Status   string                    `json:"status"`
-	Backends map[string]backendStatus  `json:"backends,omitempty"`
+	Status   string                   `json:"status"`
+	Backends map[string]backendStatus `json:"backends,omitempty"`
 }
 
 // Livez is a simple liveness probe — if the process can serve HTTP, it's alive.
 func (h *HealthHandler) Livez(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	if err != nil {
+		h.logger.Error("failed to write liveness response", "error", err)
+	}
 }
 
 // Readyz checks all database backends concurrently and reports per-backend status.
@@ -47,7 +50,10 @@ func (h *HealthHandler) Readyz(w http.ResponseWriter, r *http.Request) {
 	if len(h.backends) == 0 {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(readyzResponse{Status: "ok"})
+		err := json.NewEncoder(w).Encode(readyzResponse{Status: "ok"})
+		if err != nil {
+			h.logger.Error("failed to write readiness response", "error", err)
+		}
 		return
 	}
 

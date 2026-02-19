@@ -189,7 +189,7 @@ func (s *PostgresStore) PartitionRead(ctx context.Context, partitionNumber int, 
 			LIMIT $2
 		`, s.table)
 
-		rows, err = s.pool.Query(ctx, query, partitionNumber, createdAfter, limit)
+		rows, err = s.pool.Query(ctx, query, createdAfter, limit)
 
 	case PartitionReadTypeAddedID:
 		query = fmt.Sprintf(`
