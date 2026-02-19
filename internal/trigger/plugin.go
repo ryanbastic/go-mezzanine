@@ -52,12 +52,12 @@ func (r *PluginRegistry) LoadAll(ctx context.Context) error {
 	if r.store == nil {
 		return nil
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	plugins, err := r.store.ListPlugins(ctx)
 	if err != nil {
 		return fmt.Errorf("load plugins: %w", err)
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	for _, p := range plugins {
 		r.plugins[p.ID] = p
 	}
