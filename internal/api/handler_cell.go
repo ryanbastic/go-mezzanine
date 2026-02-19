@@ -271,6 +271,12 @@ func (h *CellHandler) PartitionRead(ctx context.Context, input *PartitionReadInp
 		return nil, huma.Error400BadRequest("invalid partition type")
 	}
 
+	if input.Limit <= 0 {
+		input.Limit = 100 // Default limit
+	} else if input.Limit > 1000 {
+		input.Limit = 1000 // Max limit
+	}
+
 	if input.PartitionNumber < 0 || input.PartitionNumber >= h.numShards {
 		h.logger.Error("invalid partition number", "partition_number", input.PartitionNumber)
 		return nil, huma.Error400BadRequest("invalid partition number")
